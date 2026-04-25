@@ -6,6 +6,7 @@ export interface TravelRecord {
   title?: string;
   location: string;
   content: string;
+  contentPreview?: string;
   category: Category;
   tags: string[];
   images: string[];

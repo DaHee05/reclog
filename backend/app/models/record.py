@@ -1,10 +1,14 @@
 import uuid
 from datetime import date, datetime
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import String, Text, Date, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class Record(Base):
@@ -16,12 +20,12 @@ class Record(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
-    title: Mapped[str | None] = mapped_column(String(200))
+    title: Mapped[Optional[str]] = mapped_column(String(200))
     content: Mapped[str] = mapped_column(Text)
     location: Mapped[str] = mapped_column(String(200))
     category: Mapped[str] = mapped_column(String(50), index=True)
     date: Mapped[date] = mapped_column(Date, index=True)
-    share_code: Mapped[str | None] = mapped_column(String(10), unique=True)
+    share_code: Mapped[Optional[str]] = mapped_column(String(10), unique=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
@@ -30,10 +34,10 @@ class Record(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="records")
-    images: Mapped[list["RecordImage"]] = relationship(
+    images: Mapped[List["RecordImage"]] = relationship(
         back_populates="record", cascade="all, delete-orphan", order_by="RecordImage.order"
     )
-    tags: Mapped[list["RecordTag"]] = relationship(
+    tags: Mapped[List["RecordTag"]] = relationship(
         back_populates="record", cascade="all, delete-orphan"
     )
 

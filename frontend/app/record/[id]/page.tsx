@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -21,8 +21,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { dummyRecords } from '@/lib/dummy-data';
-import type { Category } from '@/lib/types';
+import { fetchRecord, deleteRecord } from '@/lib/api';
+import type { TravelRecord, Category } from '@/lib/types';
 
 const categoryEmoji: Record<Category, string> = {
   travel: '✈️',
@@ -37,8 +37,23 @@ export default function RecordDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [record, setRecord] = useState<TravelRecord | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const record = dummyRecords.find((r) => r.id === id);
+  useEffect(() => {
+    fetchRecord(id)
+      .then(setRecord)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">로딩 중...</p>
+      </div>
+    );
+  }
 
   if (!record) {
     return (
@@ -59,9 +74,14 @@ export default function RecordDetailPage({
     weekday: 'long',
   });
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm('이 기록을 삭제하시겠습니까?')) {
-      router.push('/');
+      try {
+        await deleteRecord(id);
+        router.push('/');
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
@@ -83,10 +103,7 @@ export default function RecordDetailPage({
         {/* Header */}
         <header className="sticky top-0 z-50 bg-background px-5 py-4">
           <div className="flex items-center justify-between">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-card transition-colors"
-            >
+            <button onClick={() => router.back()} className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-card transition-colors">
               <ArrowLeft className="h-5 w-5" />
             </button>
             <DropdownMenu>
@@ -102,10 +119,7 @@ export default function RecordDetailPage({
                     편집하기
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleDelete}
-                  className="text-destructive flex items-center gap-2"
-                >
+                <DropdownMenuItem onClick={handleDelete} className="text-destructive flex items-center gap-2">
                   <Trash2 className="h-4 w-4" />
                   삭제하기
                 </DropdownMenuItem>
@@ -114,7 +128,7 @@ export default function RecordDetailPage({
           </div>
         </header>
 
-      {/* Image Gallery */}
+        {/* Image Gallery */}
         {record.images.length > 0 && (
           <div className="px-5 mb-5">
             <div className="relative aspect-[4/3] rounded-2xl overflow-hidden">
@@ -126,34 +140,20 @@ export default function RecordDetailPage({
                 sizes="(max-width: 768px) 100vw, 512px"
                 priority
               />
-
               {record.images.length > 1 && (
                 <>
-                  <button
-                    onClick={prevImage}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-background/80 backdrop-blur-sm text-foreground hover:bg-background transition-colors"
-                  >
+                  <button onClick={prevImage} className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-background/80 backdrop-blur-sm text-foreground hover:bg-background transition-colors">
                     <ChevronLeft className="h-5 w-5" />
                   </button>
-                  <button
-                    onClick={nextImage}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-background/80 backdrop-blur-sm text-foreground hover:bg-background transition-colors"
-                  >
+                  <button onClick={nextImage} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-background/80 backdrop-blur-sm text-foreground hover:bg-background transition-colors">
                     <ChevronRight className="h-5 w-5" />
                   </button>
-
-                  {/* Image Indicators */}
                   <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
                     {record.images.map((_, index) => (
                       <button
                         key={index}
                         onClick={() => setCurrentImageIndex(index)}
-                        className={cn(
-                          'w-2 h-2 rounded-full transition-colors',
-                          currentImageIndex === index
-                            ? 'bg-primary'
-                            : 'bg-background/60'
-                        )}
+                        className={cn('w-2 h-2 rounded-full transition-colors', currentImageIndex === index ? 'bg-primary' : 'bg-background/60')}
                       />
                     ))}
                   </div>
@@ -163,41 +163,30 @@ export default function RecordDetailPage({
           </div>
         )}
 
-      {/* Content */}
+        {/* Content */}
         <main className="px-5">
-          {/* Category & Date */}
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-xl">{categoryEmoji[record.category]}</span>
+            <span className="text-xl">{categoryEmoji[record.category] || '📝'}</span>
             <span className="text-sm text-muted-foreground">{formattedDate}</span>
           </div>
 
-          {/* Location */}
           <div className="flex items-center gap-2 text-muted-foreground mb-5">
             <MapPin className="h-4 w-4" />
             <span className="text-sm">{record.location}</span>
           </div>
 
-          {/* Tags */}
           <div className="flex flex-wrap gap-2 mb-6">
             {record.tags.map((tag) => (
-              <span
-                key={tag}
-                className="text-sm text-primary bg-card px-3 py-1.5 rounded-full"
-              >
-                {tag}
-              </span>
+              <span key={tag} className="text-sm text-primary bg-card px-3 py-1.5 rounded-full">{tag}</span>
             ))}
           </div>
 
-          {/* Content */}
           <div className="bg-card rounded-2xl p-5">
-            <p className="text-foreground leading-relaxed whitespace-pre-wrap">
-              {record.content}
-            </p>
+            <p className="text-foreground leading-relaxed whitespace-pre-wrap">{record.content}</p>
           </div>
         </main>
 
-      {/* Bottom Action */}
+        {/* Bottom Action */}
         <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm p-5">
           <div className="max-w-lg mx-auto">
             <Button asChild className="w-full rounded-full h-12">

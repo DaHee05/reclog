@@ -1,13 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { Plus } from 'lucide-react';
+import { Plus, User } from 'lucide-react';
 import { BottomNav } from '@/components/bottom-nav';
 import { CategoryCard } from '@/components/category-card';
-import { dummyRecords, userProfile } from '@/lib/dummy-data';
-import type { Category } from '@/lib/types';
+import { fetchCategories, createCategory } from '@/lib/api';
 import {
   Dialog,
   DialogContent,
@@ -17,37 +15,36 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-function getCategoryStats() {
-  const stats: Record<Category, number> = {
-    travel: 0,
-    daily: 0,
-  };
-  
-  dummyRecords.forEach((record) => {
-    stats[record.category]++;
-  });
-  
-  return stats;
-}
-
-function getCategoryRecentImage(category: Category): string | null {
-  const record = dummyRecords.find((r) => r.category === category && r.images.length > 0);
-  return record?.images[0] || null;
+interface CategoryData {
+  id: string;
+  name: string;
+  emoji: string;
+  is_default: boolean;
+  record_count: number;
 }
 
 export default function HomePage() {
-  const categoryStats = getCategoryStats();
-  const categories: Category[] = ['travel', 'daily'];
-  
-  // Category creation modal
+  const [categories, setCategories] = useState<CategoryData[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryEmoji, setNewCategoryEmoji] = useState('📝');
 
-  const handleCreateCategory = () => {
+  useEffect(() => {
+    fetchCategories().then(setCategories).catch(console.error);
+  }, []);
+
+  const handleCreateCategory = async () => {
     if (newCategoryName.trim()) {
-      alert(`"${newCategoryName}" 카테고리가 생성되었습니다!`);
-      setNewCategoryName('');
-      setShowCategoryModal(false);
+      try {
+        await createCategory(newCategoryName.trim(), newCategoryEmoji);
+        const updated = await fetchCategories();
+        setCategories(updated);
+        setNewCategoryName('');
+        setNewCategoryEmoji('📝');
+        setShowCategoryModal(false);
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
@@ -59,20 +56,14 @@ export default function HomePage() {
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-primary tracking-tight italic">LOG</h1>
             <div className="flex items-center gap-3">
-              {/* Add Category button */}
               <button
                 onClick={() => setShowCategoryModal(true)}
                 className="flex items-center justify-center w-11 h-11 rounded-full border border-border bg-card hover:bg-muted transition-colors"
               >
                 <Plus className="h-5 w-5 text-foreground" />
               </button>
-              <Link href="/profile" className="relative w-11 h-11 rounded-full overflow-hidden border-2 border-primary/30">
-                <Image
-                  src={userProfile.profileImage}
-                  alt={userProfile.name}
-                  fill
-                  className="object-cover"
-                />
+              <Link href="/profile" className="flex items-center justify-center w-11 h-11 rounded-full border-2 border-primary/30 bg-muted">
+                <User className="h-5 w-5 text-muted-foreground" />
               </Link>
             </div>
           </div>
@@ -91,19 +82,14 @@ export default function HomePage() {
 
         {/* Main Content */}
         <main className="px-5 space-y-5">
-          {categories.map((category) => {
-            const count = categoryStats[category];
-            const recentImage = getCategoryRecentImage(category);
-            
-            return (
-              <CategoryCard
-                key={category}
-                category={category}
-                count={count}
-                recentImage={recentImage}
-              />
-            );
-          })}
+          {categories.map((cat) => (
+            <CategoryCard
+              key={cat.id}
+              category={cat.name as any}
+              count={cat.record_count}
+              recentImage={null}
+            />
+          ))}
         </main>
 
         <BottomNav />
@@ -116,7 +102,6 @@ export default function HomePage() {
             <DialogTitle className="text-center">새 카테고리 만들기</DialogTitle>
           </DialogHeader>
           <div className="space-y-5 pt-2">
-            {/* Category Name */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
                 카테고리 이름
@@ -128,8 +113,18 @@ export default function HomePage() {
                 className="bg-muted border-0 rounded-xl h-12"
               />
             </div>
-
-            <Button 
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                이모지
+              </label>
+              <Input
+                placeholder="📝"
+                value={newCategoryEmoji}
+                onChange={(e) => setNewCategoryEmoji(e.target.value)}
+                className="bg-muted border-0 rounded-xl h-12"
+              />
+            </div>
+            <Button
               onClick={handleCreateCategory}
               disabled={!newCategoryName.trim()}
               className="w-full rounded-full h-12"

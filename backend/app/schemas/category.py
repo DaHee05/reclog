@@ -14,6 +14,7 @@ class CategoryRead(BaseModel):
     name: str
     emoji: str
     is_default: bool
+    record_count: int = 0
     created_at: datetime
 
     model_config = {"from_attributes": True}

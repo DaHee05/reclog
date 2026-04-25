@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, use } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { X, Calendar, MapPin, Star, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,50 +9,81 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { DEFAULT_TAGS, type Category } from '@/lib/types';
-import { createRecord, uploadImages } from '@/lib/api';
+import { fetchRecord, updateRecord, uploadImages } from '@/lib/api';
 
 const categoryOptions: { value: Category; label: string; emoji: string }[] = [
   { value: 'travel', label: '여행', emoji: '✈️' },
   { value: 'daily', label: '일상', emoji: '📖' },
 ];
 
-export default function NewRecordPage() {
+export default function EditRecordPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [category, setCategory] = useState<Category>('travel');
+
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const categoryParam = searchParams.get('category');
-    if (categoryParam && categoryParam !== 'all' && categoryOptions.some(c => c.value === categoryParam)) {
-      setCategory(categoryParam as Category);
-    }
-  }, [searchParams]);
+  // 기존 서버 이미지 URL (이미 업로드된 것)
+  const [existingImages, setExistingImages] = useState<
+    { url: string; isPrimary: boolean; order: number }[]
+  >([]);
+  // 새로 추가한 파일
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
 
+  const [primaryIndex, setPrimaryIndex] = useState(0);
+  const [date, setDate] = useState('');
+  const [category, setCategory] = useState<Category>('travel');
   const [location, setLocation] = useState('');
   const [content, setContent] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState('');
 
+  // 기존 데이터 불러오기
+  useEffect(() => {
+    fetchRecord(id)
+      .then((record) => {
+        if (!record) {
+          router.replace('/');
+          return;
+        }
+        setDate(record.date.split('T')[0]);
+        setCategory(record.category as Category);
+        setLocation(record.location);
+        setContent(record.content);
+        setSelectedTags(record.tags);
+
+        // 기존 이미지 세팅
+        setExistingImages(
+          record.images.map((url, i) => ({ url, isPrimary: i === 0, order: i }))
+        );
+        setPrimaryIndex(0);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [id, router]);
+
+  // --- 전체 이미지 목록 (기존 + 새 파일) ---
   const MAX_IMAGES = 4;
+  const totalCount = existingImages.length + newImagePreviews.length;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      const remaining = MAX_IMAGES - imageFiles.length;
+      const remaining = MAX_IMAGES - totalCount;
       if (remaining <= 0) return;
-      const newFiles = Array.from(files).slice(0, remaining);
-      setImageFiles((prev) => [...prev, ...newFiles]);
+      const added = Array.from(files).slice(0, remaining);
+      setNewImageFiles((prev) => [...prev, ...added]);
 
-      newFiles.forEach((file) => {
+      added.forEach((file) => {
         const reader = new FileReader();
         reader.onload = (event) => {
           if (event.target?.result) {
-            setImagePreviews((prev) => [...prev, event.target!.result as string]);
+            setNewImagePreviews((prev) => [...prev, event.target!.result as string]);
           }
         };
         reader.readAsDataURL(file);
@@ -60,11 +91,16 @@ export default function NewRecordPage() {
     }
   };
 
-  const removeImage = (index: number) => {
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
-    if (primaryImageIndex >= imagePreviews.length - 1) {
-      setPrimaryImageIndex(Math.max(0, imagePreviews.length - 2));
+  const removeImage = (globalIndex: number) => {
+    if (globalIndex < existingImages.length) {
+      setExistingImages((prev) => prev.filter((_, i) => i !== globalIndex));
+    } else {
+      const newIndex = globalIndex - existingImages.length;
+      setNewImageFiles((prev) => prev.filter((_, i) => i !== newIndex));
+      setNewImagePreviews((prev) => prev.filter((_, i) => i !== newIndex));
+    }
+    if (primaryIndex >= totalCount - 1) {
+      setPrimaryIndex(Math.max(0, totalCount - 2));
     }
   };
 
@@ -87,27 +123,33 @@ export default function NewRecordPage() {
 
     setSaving(true);
     try {
-      // 1. 이미지 업로드
-      let imageUrls: string[] = [];
-      if (imageFiles.length > 0) {
-        imageUrls = await uploadImages(imageFiles);
+      // 1. 새 이미지 업로드
+      let newUrls: string[] = [];
+      if (newImageFiles.length > 0) {
+        newUrls = await uploadImages(newImageFiles);
       }
 
-      // 2. 기록 생성
-      await createRecord({
+      // 2. 기존 이미지 URL + 새 이미지 URL 합치기
+      const allUrls = [
+        ...existingImages.map((img) => img.url),
+        ...newUrls,
+      ];
+
+      // 3. 업데이트
+      await updateRecord(id, {
         content,
         location,
         category,
         date,
         tags: selectedTags,
-        images: imageUrls.map((url, i) => ({
+        images: allUrls.map((url, i) => ({
           image_url: url,
-          is_primary: i === primaryImageIndex,
+          is_primary: i === primaryIndex,
           order: i,
         })),
       });
 
-      router.push('/');
+      router.push(`/record/${id}`);
     } catch (e) {
       console.error(e);
       alert('저장에 실패했습니다.');
@@ -115,6 +157,20 @@ export default function NewRecordPage() {
       setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">로딩 중...</p>
+      </div>
+    );
+  }
+
+  // 이미지 미리보기 목록 (기존 URL + 새 파일 프리뷰)
+  const allPreviews = [
+    ...existingImages.map((img) => img.url),
+    ...newImagePreviews,
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -124,7 +180,7 @@ export default function NewRecordPage() {
           <button onClick={() => router.back()} className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-card transition-colors">
             <X className="h-5 w-5" />
           </button>
-          <h1 className="text-lg font-semibold text-foreground">새 기록</h1>
+          <h1 className="text-lg font-semibold text-foreground">기록 편집</h1>
           <Button onClick={handleSave} size="sm" className="rounded-full px-4" disabled={saving}>
             {saving ? '저장 중...' : '저장'}
           </Button>
@@ -137,33 +193,33 @@ export default function NewRecordPage() {
           <label className="block">
             <div className={cn(
               'bg-card border-2 border-dashed rounded-2xl p-8 text-center transition-colors',
-              imageFiles.length >= MAX_IMAGES
+              totalCount >= MAX_IMAGES
                 ? 'border-muted cursor-not-allowed opacity-50'
                 : 'border-border cursor-pointer hover:border-primary/50'
             )}>
-              <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" disabled={imageFiles.length >= MAX_IMAGES} />
+              <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" disabled={totalCount >= MAX_IMAGES} />
               <div className="text-4xl mb-2">📷</div>
               <p className="text-sm text-muted-foreground">탭하여 사진 추가하기</p>
-              <p className="text-xs text-muted-foreground mt-1">최대 {MAX_IMAGES}장 ({imageFiles.length}/{MAX_IMAGES})</p>
+              <p className="text-xs text-muted-foreground mt-1">최대 {MAX_IMAGES}장 ({totalCount}/{MAX_IMAGES})</p>
             </div>
           </label>
 
-          {imagePreviews.length > 0 && (
+          {allPreviews.length > 0 && (
             <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-              {imagePreviews.map((img, index) => (
+              {allPreviews.map((img, index) => (
                 <div
                   key={index}
                   className={cn(
                     'relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2',
-                    primaryImageIndex === index ? 'border-primary' : 'border-transparent'
+                    primaryIndex === index ? 'border-primary' : 'border-transparent'
                   )}
                 >
-                  <Image src={img} alt={`업로드 이미지 ${index + 1}`} fill className="object-cover" />
+                  <Image src={img} alt={`이미지 ${index + 1}`} fill className="object-cover" />
                   <button
-                    onClick={() => setPrimaryImageIndex(index)}
+                    onClick={() => setPrimaryIndex(index)}
                     className={cn(
                       'absolute top-1 left-1 p-1 rounded-full',
-                      primaryImageIndex === index ? 'bg-primary text-primary-foreground' : 'bg-background/80 text-muted-foreground'
+                      primaryIndex === index ? 'bg-primary text-primary-foreground' : 'bg-background/80 text-muted-foreground'
                     )}
                   >
                     <Star className="h-3 w-3" />

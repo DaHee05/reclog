@@ -1,5 +1,6 @@
 import uuid
-from datetime import date, datetime
+import datetime
+from typing import Optional, List
 
 from pydantic import BaseModel
 
@@ -22,50 +23,51 @@ class RecordImageRead(BaseModel):
 
 # --- Record ---
 class RecordCreate(BaseModel):
-    title: str | None = None
+    title: Optional[str] = None
     content: str
     location: str
     category: str
-    date: date
-    tags: list[str] = []
-    images: list[RecordImageCreate] = []
+    date: datetime.date
+    tags: List[str] = []
+    images: List[RecordImageCreate] = []
 
 
 class RecordUpdate(BaseModel):
-    title: str | None = None
-    content: str | None = None
-    location: str | None = None
-    category: str | None = None
-    date: date | None = None
-    tags: list[str] | None = None
-    images: list[RecordImageCreate] | None = None
+    title: Optional[str] = None
+    content: Optional[str] = None
+    location: Optional[str] = None
+    category: Optional[str] = None
+    date: Optional[datetime.date] = None
+    tags: Optional[List[str]] = None
+    images: Optional[List[RecordImageCreate]] = None
 
 
 class RecordRead(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
-    title: str | None = None
+    title: Optional[str] = None
     content: str
     location: str
     category: str
-    date: date
-    share_code: str | None = None
-    tags: list[str] = []
-    images: list[RecordImageRead] = []
-    created_at: datetime
-    updated_at: datetime
+    date: datetime.date
+    share_code: Optional[str] = None
+    tags: List[str] = []
+    images: List[RecordImageRead] = []
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
 
     model_config = {"from_attributes": True}
 
 
 class RecordListRead(BaseModel):
     id: uuid.UUID
-    title: str | None = None
+    title: Optional[str] = None
+    content_preview: str = ""
     location: str
     category: str
-    date: date
-    tags: list[str] = []
-    images: list[RecordImageRead] = []
-    created_at: datetime
+    date: datetime.date
+    tags: List[str] = []
+    images: List[RecordImageRead] = []
+    created_at: datetime.datetime
 
     model_config = {"from_attributes": True}
