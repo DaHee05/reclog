@@ -4,10 +4,10 @@ import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
-import { Plus, ChevronDown, List, Grid3X3, Search, Users, Copy, Check, X } from 'lucide-react';
+import { Plus, ChevronDown, List, Grid3X3, Search, Users, Copy, Check, X, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { BottomNav } from '@/components/bottom-nav';
 import { ImageCollage } from '@/components/image-collage';
-import { fetchRecords } from '@/lib/api';
+import { fetchRecords, type PaginatedRecords } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -192,6 +192,10 @@ export default function CategoryRecordsPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [records, setRecords] = useState<TravelRecord[]>([]);
+  const [recordsLoading, setRecordsLoading] = useState(true);
+  const [recordsError, setRecordsError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Share modal state
   const [showShareModal, setShowShareModal] = useState(false);
@@ -200,10 +204,24 @@ export default function CategoryRecordsPage() {
   const [copied, setCopied] = useState(false);
   const [shareTab, setShareTab] = useState<'create' | 'join'>('create');
 
+  const loadRecords = async (page = 1) => {
+    setRecordsLoading(true);
+    setRecordsError('');
+    try {
+      const data = await fetchRecords(category !== 'all' ? category : undefined, page, 5);
+      setRecords(data.items);
+      setCurrentPage(data.page);
+      setTotalPages(data.total_pages);
+    } catch (e) {
+      setRecordsError('기록을 불러오지 못했습니다.');
+    } finally {
+      setRecordsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchRecords(category !== 'all' ? category : undefined)
-      .then(setRecords)
-      .catch(console.error);
+    setCurrentPage(1);
+    loadRecords(1);
   }, [category]);
 
   const handleGenerateCode = () => setShareCode(generateShareCode());
@@ -305,10 +323,55 @@ export default function CategoryRecordsPage() {
 
         {/* Main Content */}
         <main className={cn(viewType === 'feed' ? 'px-4 py-4' : '')}>
-          {viewType === 'feed' ? (
-            <FeedView records={filteredRecords} />
-          ) : (
-            <CalendarView records={filteredRecords} category={category} />
+          {recordsLoading && (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          )}
+
+          {recordsError && (
+            <div className="bg-destructive/10 rounded-2xl p-5 text-center mx-4">
+              <AlertCircle className="h-6 w-6 text-destructive mx-auto mb-2" />
+              <p className="text-sm text-destructive mb-3">{recordsError}</p>
+              <Button variant="outline" size="sm" className="rounded-full gap-2" onClick={loadRecords}>
+                <RefreshCw className="h-3.5 w-3.5" />다시 시도
+              </Button>
+            </div>
+          )}
+
+          {!recordsLoading && !recordsError && (
+            viewType === 'feed' ? (
+              <FeedView records={filteredRecords} />
+            ) : (
+              <CalendarView records={filteredRecords} category={category} />
+            )
+          )}
+
+          {/* Pagination */}
+          {!recordsLoading && !recordsError && totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 py-6 px-4">
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                disabled={currentPage <= 1}
+                onClick={() => loadRecords(currentPage - 1)}
+              >
+                이전
+              </Button>
+              <span className="text-sm text-muted-foreground px-3">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                disabled={currentPage >= totalPages}
+                onClick={() => loadRecords(currentPage + 1)}
+              >
+                다음
+              </Button>
+            </div>
           )}
         </main>
 

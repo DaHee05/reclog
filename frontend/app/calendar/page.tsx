@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { ChevronLeft, ChevronRight, MapPin, X } from 'lucide-react';
 import { BottomNav } from '@/components/bottom-nav';
 import { cn } from '@/lib/utils';
-import { fetchRecords } from '@/lib/api';
+import { fetchAllRecords } from '@/lib/api';
 import type { TravelRecord, Category } from '@/lib/types';
 
 const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -23,7 +23,7 @@ export default function CalendarPage() {
   const [records, setRecords] = useState<TravelRecord[]>([]);
 
   useEffect(() => {
-    fetchRecords().then(setRecords).catch(console.error);
+    fetchAllRecords().then(setRecords).catch(console.error);
   }, []);
 
   const year = currentDate.getFullYear();

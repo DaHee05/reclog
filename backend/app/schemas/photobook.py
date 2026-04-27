@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime, date
 from typing import Optional
 from uuid import UUID
@@ -7,8 +7,8 @@ from app.models.photobook import PhotobookStatus
 
 
 class PhotobookOrderBase(BaseModel):
-    title: str
-    category: Optional[str] = None
+    title: str = Field(..., min_length=1, max_length=200)
+    category: Optional[str] = Field(None, max_length=50)
     start_date: Optional[date] = None
     end_date: Optional[date] = None
 

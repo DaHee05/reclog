@@ -2,12 +2,12 @@ import uuid
 import datetime
 from typing import Optional, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # --- Image ---
 class RecordImageCreate(BaseModel):
-    image_url: str
+    image_url: str = Field(..., max_length=500)
     is_primary: bool = False
     order: int = 0
 
@@ -23,23 +23,23 @@ class RecordImageRead(BaseModel):
 
 # --- Record ---
 class RecordCreate(BaseModel):
-    title: Optional[str] = None
-    content: str
-    location: Optional[str] = None
-    category: Optional[str] = None
+    title: Optional[str] = Field(None, max_length=200)
+    content: str = Field(..., min_length=1, max_length=5000)
+    location: Optional[str] = Field(None, max_length=200)
+    category: Optional[str] = Field(None, max_length=50)
     date: Optional[datetime.date] = None
-    tags: List[str] = []
-    images: List[RecordImageCreate] = []
+    tags: List[str] = Field(default=[], max_length=10)
+    images: List[RecordImageCreate] = Field(default=[], max_length=4)
 
 
 class RecordUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-    location: Optional[str] = None
-    category: Optional[str] = None
+    title: Optional[str] = Field(None, max_length=200)
+    content: Optional[str] = Field(None, min_length=1, max_length=5000)
+    location: Optional[str] = Field(None, max_length=200)
+    category: Optional[str] = Field(None, max_length=50)
     date: Optional[datetime.date] = None
-    tags: Optional[List[str]] = None
-    images: Optional[List[RecordImageCreate]] = None
+    tags: Optional[List[str]] = Field(None, max_length=10)
+    images: Optional[List[RecordImageCreate]] = Field(None, max_length=4)
 
 
 class RecordRead(BaseModel):

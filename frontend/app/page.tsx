@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, User } from 'lucide-react';
+import { Plus, User, AlertCircle, RefreshCw } from 'lucide-react';
 import { BottomNav } from '@/components/bottom-nav';
 import { CategoryCard } from '@/components/category-card';
 import { fetchCategories, createCategory } from '@/lib/api';
@@ -25,12 +25,27 @@ interface CategoryData {
 
 export default function HomePage() {
   const [categories, setCategories] = useState<CategoryData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryEmoji, setNewCategoryEmoji] = useState('📝');
 
+  const loadCategories = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await fetchCategories();
+      setCategories(data);
+    } catch (e) {
+      setError('카테고리를 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchCategories().then(setCategories).catch(console.error);
+    loadCategories();
   }, []);
 
   const handleCreateCategory = async () => {
@@ -82,7 +97,28 @@ export default function HomePage() {
 
         {/* Main Content */}
         <main className="px-5 space-y-5">
-          {categories.map((cat) => (
+          {loading && (
+            <div className="space-y-4">
+              {[1, 2].map((i) => (
+                <div key={i} className="bg-card rounded-2xl p-5 animate-pulse">
+                  <div className="h-5 bg-muted rounded w-1/3 mb-3" />
+                  <div className="h-4 bg-muted rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-destructive/10 rounded-2xl p-5 text-center">
+              <AlertCircle className="h-6 w-6 text-destructive mx-auto mb-2" />
+              <p className="text-sm text-destructive mb-3">{error}</p>
+              <Button variant="outline" size="sm" className="rounded-full gap-2" onClick={loadCategories}>
+                <RefreshCw className="h-3.5 w-3.5" />다시 시도
+              </Button>
+            </div>
+          )}
+
+          {!loading && !error && categories.map((cat) => (
             <CategoryCard
               key={cat.id}
               category={cat.name as any}

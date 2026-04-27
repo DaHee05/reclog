@@ -1,12 +1,12 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CategoryCreate(BaseModel):
-    name: str
-    emoji: str
+    name: str = Field(..., min_length=1, max_length=50)
+    emoji: str = Field(..., min_length=1, max_length=10)
 
 
 class CategoryRead(BaseModel):

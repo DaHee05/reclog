@@ -3,18 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { X, Calendar, MapPin, Star, Trash2 } from 'lucide-react';
+import { X, Calendar, MapPin, Star, Trash2, ImagePlus, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { DEFAULT_TAGS, type Category } from '@/lib/types';
-import { createRecord, uploadImages } from '@/lib/api';
-
-const categoryOptions: { value: Category; label: string; emoji: string }[] = [
-  { value: 'travel', label: '여행', emoji: '✈️' },
-  { value: 'daily', label: '일상', emoji: '📖' },
-];
+import { DEFAULT_TAGS } from '@/lib/types';
+import { createRecord, uploadImages, generateOverlay } from '@/lib/api';
+import { LocationSearch } from '@/components/location-search';
 
 export default function NewRecordPage() {
   const router = useRouter();
@@ -23,13 +20,15 @@ export default function NewRecordPage() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [category, setCategory] = useState<Category>('travel');
+  const [category, setCategory] = useState('travel');
   const [saving, setSaving] = useState(false);
+  const [savingMessage, setSavingMessage] = useState('');
+  const [enableOverlay, setEnableOverlay] = useState(false);
 
   useEffect(() => {
     const categoryParam = searchParams.get('category');
-    if (categoryParam && categoryParam !== 'all' && categoryOptions.some(c => c.value === categoryParam)) {
-      setCategory(categoryParam as Category);
+    if (categoryParam && categoryParam !== 'all') {
+      setCategory(categoryParam);
     }
   }, [searchParams]);
 
@@ -83,20 +82,34 @@ export default function NewRecordPage() {
   };
 
   const handleSave = async () => {
-    if (!content.trim() || !location.trim()) return;
+    if (!content.trim()) return;
 
     setSaving(true);
     try {
-      // 1. 이미지 업로드
       let imageUrls: string[] = [];
+
       if (imageFiles.length > 0) {
-        imageUrls = await uploadImages(imageFiles);
+        if (enableOverlay) {
+          // 감성 메모 생성 모드: 각 이미지를 AI로 변환
+          const tagsStr = selectedTags.length > 0 ? selectedTags.join(' ') : undefined;
+          const urls: string[] = [];
+          for (let i = 0; i < imageFiles.length; i++) {
+            setSavingMessage(`감성 메모 생성 중... (${i + 1}/${imageFiles.length})`);
+            const url = await generateOverlay(imageFiles[i], tagsStr);
+            urls.push(url);
+          }
+          imageUrls = urls;
+        } else {
+          // 일반 업로드
+          setSavingMessage('이미지 업로드 중...');
+          imageUrls = await uploadImages(imageFiles);
+        }
       }
 
-      // 2. 기록 생성
+      setSavingMessage('기록 저장 중...');
       await createRecord({
         content,
-        location,
+        location: location || undefined,
         category,
         date,
         tags: selectedTags,
@@ -113,56 +126,61 @@ export default function NewRecordPage() {
       alert('저장에 실패했습니다.');
     } finally {
       setSaving(false);
+      setSavingMessage('');
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background px-5 py-4">
-        <div className="flex items-center justify-between">
-          <button onClick={() => router.back()} className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-card transition-colors">
+      {/* Header - glass effect */}
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50 px-5 py-4">
+        <div className="flex items-center justify-between max-w-lg mx-auto">
+          <button onClick={() => router.back()} className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-muted transition-colors">
             <X className="h-5 w-5" />
           </button>
           <h1 className="text-lg font-semibold text-foreground">새 기록</h1>
-          <Button onClick={handleSave} size="sm" className="rounded-full px-4" disabled={saving}>
+          <Button onClick={handleSave} size="sm" className="rounded-full px-5" disabled={saving}>
             {saving ? '저장 중...' : '저장'}
           </Button>
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-5 pb-24">
+      <main className="max-w-lg mx-auto px-5 pt-6 pb-28">
         {/* Image Upload Section */}
-        <div className="mb-5">
+        <div className="mb-6">
           <label className="block">
             <div className={cn(
-              'bg-card border-2 border-dashed rounded-2xl p-8 text-center transition-colors',
+              'relative overflow-hidden rounded-2xl border-2 border-dashed p-10 text-center transition-all duration-200',
               imageFiles.length >= MAX_IMAGES
                 ? 'border-muted cursor-not-allowed opacity-50'
-                : 'border-border cursor-pointer hover:border-primary/50'
+                : 'border-border bg-gradient-to-br from-muted/50 to-card cursor-pointer hover:border-primary/40 hover:from-primary/5 hover:to-card'
             )}>
               <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" disabled={imageFiles.length >= MAX_IMAGES} />
-              <div className="text-4xl mb-2">📷</div>
-              <p className="text-sm text-muted-foreground">탭하여 사진 추가하기</p>
-              <p className="text-xs text-muted-foreground mt-1">최대 {MAX_IMAGES}장 ({imageFiles.length}/{MAX_IMAGES})</p>
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                  <ImagePlus className="h-6 w-6 text-primary" />
+                </div>
+                <p className="text-sm font-medium text-foreground">사진 추가하기</p>
+                <p className="text-xs text-muted-foreground">최대 {MAX_IMAGES}장 ({imageFiles.length}/{MAX_IMAGES})</p>
+              </div>
             </div>
           </label>
 
           {imagePreviews.length > 0 && (
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+            <div className="mt-4 flex gap-2.5 overflow-x-auto pb-2">
               {imagePreviews.map((img, index) => (
                 <div
                   key={index}
                   className={cn(
-                    'relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2',
-                    primaryImageIndex === index ? 'border-primary' : 'border-transparent'
+                    'relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all',
+                    primaryImageIndex === index ? 'border-primary shadow-md shadow-primary/20' : 'border-transparent'
                   )}
                 >
                   <Image src={img} alt={`업로드 이미지 ${index + 1}`} fill className="object-cover" />
                   <button
                     onClick={() => setPrimaryImageIndex(index)}
                     className={cn(
-                      'absolute top-1 left-1 p-1 rounded-full',
+                      'absolute top-1 left-1 p-1 rounded-full transition-colors',
                       primaryImageIndex === index ? 'bg-primary text-primary-foreground' : 'bg-background/80 text-muted-foreground'
                     )}
                   >
@@ -175,52 +193,45 @@ export default function NewRecordPage() {
               ))}
             </div>
           )}
+
+          {/* Overlay Toggle */}
+          {imageFiles.length > 0 && (
+            <div className="mt-4 flex items-center justify-between bg-card border border-border/50 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2.5">
+                <Sparkles className="h-4 w-4 text-amber-500" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">감성 손글씨 메모</p>
+                  <p className="text-xs text-muted-foreground">AI가 폴라로이드 스타일 메모를 그려요</p>
+                </div>
+              </div>
+              <Switch checked={enableOverlay} onCheckedChange={setEnableOverlay} />
+            </div>
+          )}
         </div>
 
         {/* Form Fields */}
-        <div className="space-y-5">
+        <div className="space-y-6">
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />날짜
+            <label className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2.5">
+              <Calendar className="h-3.5 w-3.5" />날짜
             </label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-card border-0 rounded-xl h-12" />
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-card border border-border/50 rounded-xl h-12 focus:border-primary transition-colors" />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">카테고리</label>
-            <div className="grid grid-cols-3 gap-2">
-              {categoryOptions.map((cat) => (
-                <button
-                  key={cat.value}
-                  onClick={() => setCategory(cat.value)}
-                  className={cn(
-                    'flex flex-col items-center gap-1.5 p-3 rounded-2xl transition-all',
-                    category === cat.value
-                      ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2'
-                      : 'bg-card text-foreground hover:bg-muted'
-                  )}
-                >
-                  <span className="text-xl">{cat.emoji}</span>
-                  <span className="text-xs font-medium">{cat.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />장소
+            <label className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2.5">
+              <MapPin className="h-3.5 w-3.5" />장소
             </label>
-            <Input placeholder="장소를 입력하세요" value={location} onChange={(e) => setLocation(e.target.value)} className="bg-card border-0 rounded-xl h-12" />
+            <LocationSearch value={location} onChange={setLocation} />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">내용</label>
-            <Textarea placeholder="오늘 어땠나요?" value={content} onChange={(e) => setContent(e.target.value)} rows={4} className="bg-card border-0 rounded-xl resize-none" />
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2.5 block">내용</label>
+            <Textarea placeholder="오늘 어땠나요?" value={content} onChange={(e) => setContent(e.target.value)} rows={5} className="bg-card border border-border/50 rounded-xl resize-none focus:border-primary transition-colors" />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">해시태그</label>
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2.5 block">해시태그</label>
             <div className="flex flex-wrap gap-2 mb-3">
               {DEFAULT_TAGS.map((tag) => (
                 <button
@@ -230,7 +241,7 @@ export default function NewRecordPage() {
                     'px-3 py-1.5 rounded-full text-sm transition-all',
                     selectedTags.includes(tag)
                       ? 'bg-foreground text-background'
-                      : 'bg-card text-muted-foreground hover:text-foreground'
+                      : 'bg-card border border-border/50 text-muted-foreground hover:text-foreground hover:border-foreground/20'
                   )}
                 >
                   {tag}
@@ -238,8 +249,8 @@ export default function NewRecordPage() {
               ))}
             </div>
             <div className="flex gap-2">
-              <Input placeholder="태그 직접 입력" value={customTag} onChange={(e) => setCustomTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCustomTag()} className="bg-card border-0 rounded-xl h-11" />
-              <Button variant="outline" onClick={addCustomTag} className="rounded-xl">추가</Button>
+              <Input placeholder="태그 직접 입력" value={customTag} onChange={(e) => setCustomTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCustomTag()} className="bg-card border border-border/50 rounded-xl h-11 focus:border-primary transition-colors" />
+              <Button variant="outline" onClick={addCustomTag} className="rounded-xl border-border/50">추가</Button>
             </div>
             {selectedTags.filter((tag) => !DEFAULT_TAGS.includes(tag)).length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3">
@@ -253,17 +264,25 @@ export default function NewRecordPage() {
             )}
           </div>
         </div>
+      </main>
 
-        {/* Bottom Actions */}
-        <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm p-5">
-          <div className="max-w-lg mx-auto flex gap-3">
-            <Button variant="outline" className="flex-1 rounded-full h-12" onClick={() => router.back()}>취소</Button>
+      {/* Bottom Actions - glass effect */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t border-border/50 p-5">
+        <div className="max-w-lg mx-auto">
+          {saving && savingMessage && (
+            <div className="flex items-center justify-center gap-2 mb-3 text-sm text-primary">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>{savingMessage}</span>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1 rounded-full h-12 border-border/50" onClick={() => router.back()}>취소</Button>
             <Button className="flex-1 rounded-full h-12" onClick={handleSave} disabled={saving}>
               {saving ? '저장 중...' : '저장'}
             </Button>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

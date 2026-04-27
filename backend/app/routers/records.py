@@ -7,7 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.models.record import Record, RecordImage, RecordTag
+from app.models.user import User
 from app.schemas.record import (
     RecordCreate,
     RecordUpdate,
@@ -16,9 +18,6 @@ from app.schemas.record import (
 )
 
 router = APIRouter(prefix="/api/records", tags=["records"])
-
-# 임시 테스트 유저 ID (인증 연동 전까지 사용)
-TEST_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 def _record_to_read(record: Record, *, preview: bool = False) -> dict:
@@ -35,12 +34,16 @@ def _record_to_read(record: Record, *, preview: bool = False) -> dict:
 
 
 @router.post("", response_model=RecordRead, status_code=status.HTTP_201_CREATED)
-async def create_record(body: RecordCreate, db: AsyncSession = Depends(get_db)):
+async def create_record(
+    body: RecordCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if not body.content or not body.content.strip():
         raise HTTPException(status_code=422, detail="내용을 입력해주세요.")
 
     record = Record(
-        user_id=TEST_USER_ID,
+        user_id=current_user.id,
         title=body.title,
         content=body.content,
         location=body.location,
@@ -63,16 +66,19 @@ async def create_record(body: RecordCreate, db: AsyncSession = Depends(get_db)):
     return _record_to_read(record)
 
 
-@router.get("", response_model=List[RecordListRead])
+@router.get("")
 async def list_records(
     category: Optional[str] = Query(None),
     year: Optional[int] = Query(None),
     month: Optional[int] = Query(None),
+    page: int = Query(1, ge=1),
+    size: int = Query(5, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     stmt = (
         select(Record)
-        .where(Record.user_id == TEST_USER_ID)
+        .where(Record.user_id == current_user.id)
         .options(selectinload(Record.images), selectinload(Record.tags))
         .order_by(Record.date.desc())
     )
@@ -84,17 +90,33 @@ async def list_records(
     if month:
         stmt = stmt.where(func.extract("month", Record.date) == month)
 
+    # 전체 개수 조회
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    # 페이지네이션 적용
+    stmt = stmt.offset((page - 1) * size).limit(size)
     result = await db.execute(stmt)
     records = result.scalars().all()
 
-    return [_record_to_read(r, preview=True) for r in records]
+    return {
+        "items": [_record_to_read(r, preview=True) for r in records],
+        "total": total,
+        "page": page,
+        "size": size,
+        "total_pages": (total + size - 1) // size,
+    }
 
 
 @router.get("/{record_id}", response_model=RecordRead)
-async def get_record(record_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_record(
+    record_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     stmt = (
         select(Record)
-        .where(Record.id == record_id, Record.user_id == TEST_USER_ID)
+        .where(Record.id == record_id, Record.user_id == current_user.id)
         .options(selectinload(Record.images), selectinload(Record.tags))
     )
     result = await db.execute(stmt)
@@ -108,11 +130,14 @@ async def get_record(record_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 
 @router.put("/{record_id}", response_model=RecordRead)
 async def update_record(
-    record_id: uuid.UUID, body: RecordUpdate, db: AsyncSession = Depends(get_db)
+    record_id: uuid.UUID,
+    body: RecordUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     stmt = (
         select(Record)
-        .where(Record.id == record_id, Record.user_id == TEST_USER_ID)
+        .where(Record.id == record_id, Record.user_id == current_user.id)
         .options(selectinload(Record.images), selectinload(Record.tags))
     )
     result = await db.execute(stmt)
@@ -157,8 +182,12 @@ async def update_record(
 
 
 @router.delete("/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_record(record_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    stmt = select(Record).where(Record.id == record_id, Record.user_id == TEST_USER_ID)
+async def delete_record(
+    record_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    stmt = select(Record).where(Record.id == record_id, Record.user_id == current_user.id)
     result = await db.execute(stmt)
     record = result.scalar_one_or_none()
 

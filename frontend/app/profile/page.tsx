@@ -14,7 +14,8 @@ import {
 import type { Category } from '@/lib/types';
 import { BottomNav } from '@/components/bottom-nav';
 import { Button } from '@/components/ui/button';
-import { fetchRecords } from '@/lib/api';
+import { fetchAllRecords } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 import type { TravelRecord } from '@/lib/types';
 
 const menuItems = [
@@ -34,10 +35,11 @@ const categoryLabel: Record<string, string> = {
 };
 
 export default function ProfilePage() {
+  const { user, signOut } = useAuth();
   const [records, setRecords] = useState<TravelRecord[]>([]);
 
   useEffect(() => {
-    fetchRecords().then(setRecords).catch(console.error);
+    fetchAllRecords().then(setRecords).catch(console.error);
   }, []);
 
   const categoryStats: Record<string, number> = {};
@@ -45,9 +47,7 @@ export default function ProfilePage() {
     categoryStats[record.category] = (categoryStats[record.category] || 0) + 1;
   });
 
-  const handleLogout = () => {
-    alert('로그아웃 되었습니다.');
-  };
+  const nickname = user?.email?.split('@')[0] || '사용자';
 
   return (
     <div className="min-h-screen bg-background">
@@ -64,7 +64,7 @@ export default function ProfilePage() {
                 <User className="h-8 w-8 text-muted-foreground" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-foreground">테스트유저</h2>
+                <h2 className="text-xl font-bold text-foreground">{nickname}</h2>
                 <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
                   <Calendar className="h-3.5 w-3.5" />
                   <span>서비스 이용 중</span>
@@ -133,7 +133,7 @@ export default function ProfilePage() {
           <Button
             variant="outline"
             className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/5 rounded-2xl h-12"
-            onClick={handleLogout}
+            onClick={signOut}
           >
             <LogOut className="h-5 w-5" />
             로그아웃

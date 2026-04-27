@@ -6,14 +6,13 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.models.category import Category
 from app.models.record import Record
+from app.models.user import User
 from app.schemas.category import CategoryCreate, CategoryRead
 
 router = APIRouter(prefix="/api/categories", tags=["categories"])
-
-# 임시 테스트 유저 ID (인증 연동 전까지 사용)
-TEST_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 DEFAULT_CATEGORIES = [
     {"name": "travel", "emoji": "✈️"},
@@ -21,17 +20,17 @@ DEFAULT_CATEGORIES = [
 ]
 
 
-async def _ensure_defaults(db: AsyncSession) -> None:
+async def _ensure_defaults(db: AsyncSession, user_id: uuid.UUID) -> None:
     """기본 카테고리가 없으면 자동 생성"""
     result = await db.execute(
         select(Category).where(
-            Category.user_id == TEST_USER_ID, Category.is_default == True  # noqa: E712
+            Category.user_id == user_id, Category.is_default == True  # noqa: E712
         )
     )
     if not result.scalars().first():
         for cat in DEFAULT_CATEGORIES:
             db.add(Category(
-                user_id=TEST_USER_ID,
+                user_id=user_id,
                 name=cat["name"],
                 emoji=cat["emoji"],
                 is_default=True,
@@ -40,8 +39,11 @@ async def _ensure_defaults(db: AsyncSession) -> None:
 
 
 @router.get("", response_model=List[CategoryRead])
-async def list_categories(db: AsyncSession = Depends(get_db)):
-    await _ensure_defaults(db)
+async def list_categories(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await _ensure_defaults(db, current_user.id)
 
     # 카테고리 + record_count 조회
     stmt = (
@@ -50,7 +52,7 @@ async def list_categories(db: AsyncSession = Depends(get_db)):
             func.count(Record.id).label("record_count"),
         )
         .outerjoin(Record, Record.category == Category.name)
-        .where(Category.user_id == TEST_USER_ID)
+        .where(Category.user_id == current_user.id)
         .group_by(Category.id)
         .order_by(Category.is_default.desc(), Category.created_at)
     )
@@ -72,9 +74,22 @@ async def list_categories(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", response_model=CategoryRead, status_code=status.HTTP_201_CREATED)
-async def create_category(body: CategoryCreate, db: AsyncSession = Depends(get_db)):
+async def create_category(
+    body: CategoryCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # 중복 체크
+    existing = await db.execute(
+        select(Category).where(
+            Category.user_id == current_user.id, Category.name == body.name
+        )
+    )
+    if existing.scalars().first():
+        raise HTTPException(status_code=400, detail="이미 같은 이름의 카테고리가 있습니다")
+
     category = Category(
-        user_id=TEST_USER_ID,
+        user_id=current_user.id,
         name=body.name,
         emoji=body.emoji,
         is_default=False,
@@ -94,10 +109,14 @@ async def create_category(body: CategoryCreate, db: AsyncSession = Depends(get_d
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_category(category_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def delete_category(
+    category_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     result = await db.execute(
         select(Category).where(
-            Category.id == category_id, Category.user_id == TEST_USER_ID
+            Category.id == category_id, Category.user_id == current_user.id
         )
     )
     category = result.scalar_one_or_none()

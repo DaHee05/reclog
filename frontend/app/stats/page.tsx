@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { BottomNav } from '@/components/bottom-nav';
-import { fetchRecords } from '@/lib/api';
+import { fetchAllRecords } from '@/lib/api';
 import type { TravelRecord, Category } from '@/lib/types';
 import {
   BarChart,
@@ -41,7 +41,7 @@ export default function StatsPage() {
   const [records, setRecords] = useState<TravelRecord[]>([]);
 
   useEffect(() => {
-    fetchRecords().then(setRecords).catch(console.error);
+    fetchAllRecords().then(setRecords).catch(console.error);
   }, []);
 
   const stats = useMemo(() => {
