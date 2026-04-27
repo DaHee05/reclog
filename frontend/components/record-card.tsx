@@ -6,7 +6,7 @@ import { MapPin } from 'lucide-react';
 import type { TravelRecord, Category } from '@/lib/types';
 import { CATEGORIES } from '@/lib/types';
 
-const categoryEmoji: Record<Category, string> = {
+const categoryEmoji: Record<string, string> = {
   travel: '✈️',
   performance: '🎤',
   romance: '💕',
@@ -35,7 +35,7 @@ export function RecordCard({ record, showCategory = true }: RecordCardProps) {
             <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
               <Image
                 src={record.images[0]}
-                alt={record.title}
+                alt={record.title || ''}
                 fill
                 className="object-cover"
                 sizes="64px"

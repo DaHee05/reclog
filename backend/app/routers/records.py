@@ -36,6 +36,9 @@ def _record_to_read(record: Record, *, preview: bool = False) -> dict:
 
 @router.post("", response_model=RecordRead, status_code=status.HTTP_201_CREATED)
 async def create_record(body: RecordCreate, db: AsyncSession = Depends(get_db)):
+    if not body.content or not body.content.strip():
+        raise HTTPException(status_code=422, detail="내용을 입력해주세요.")
+
     record = Record(
         user_id=TEST_USER_ID,
         title=body.title,

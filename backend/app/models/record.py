@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from datetime import date, datetime
 from typing import Optional, List, TYPE_CHECKING
@@ -22,9 +24,9 @@ class Record(Base):
     )
     title: Mapped[Optional[str]] = mapped_column(String(200))
     content: Mapped[str] = mapped_column(Text)
-    location: Mapped[str] = mapped_column(String(200))
-    category: Mapped[str] = mapped_column(String(50), index=True)
-    date: Mapped[date] = mapped_column(Date, index=True)
+    location: Mapped[Optional[str]] = mapped_column(String(200))
+    category: Mapped[Optional[str]] = mapped_column(String(50), index=True)
+    date: Mapped[Optional[date]] = mapped_column(Date, index=True)
     share_code: Mapped[Optional[str]] = mapped_column(String(10), unique=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow

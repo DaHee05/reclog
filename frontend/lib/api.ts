@@ -151,3 +151,47 @@ export async function uploadImages(files: File[]): Promise<string[]> {
   const data: { urls: string[] } = await res.json();
   return data.urls;
 }
+
+// --- Photobooks ---
+export interface PhotobookOrder {
+  id: string;
+  user_id: string;
+  title: string;
+  category?: string;
+  start_date?: string;
+  end_date?: string;
+  status: 'pending' | 'processing' | 'completed' | 'shipping' | 'delivered';
+  created_at: string;
+  updated_at: string;
+}
+
+export async function createPhotobook(order: {
+  title: string;
+  category?: string;
+  start_date?: string;
+  end_date?: string;
+}): Promise<PhotobookOrder> {
+  const res = await fetch(`${API_URL}/api/photobooks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(order),
+  });
+  if (!res.ok) throw new Error('Failed to create photobook');
+  return res.json();
+}
+
+export async function fetchPhotobooks(): Promise<PhotobookOrder[]> {
+  const res = await fetch(`${API_URL}/api/photobooks`);
+  if (!res.ok) throw new Error('Failed to fetch photobooks');
+  return res.json();
+}
+
+export async function updatePhotobookStatus(id: string, status: PhotobookOrder['status']): Promise<PhotobookOrder> {
+  const res = await fetch(`${API_URL}/api/photobooks/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error('Failed to update photobook status');
+  return res.json();
+}

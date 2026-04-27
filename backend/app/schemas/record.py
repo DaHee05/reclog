@@ -25,9 +25,9 @@ class RecordImageRead(BaseModel):
 class RecordCreate(BaseModel):
     title: Optional[str] = None
     content: str
-    location: str
-    category: str
-    date: datetime.date
+    location: Optional[str] = None
+    category: Optional[str] = None
+    date: Optional[datetime.date] = None
     tags: List[str] = []
     images: List[RecordImageCreate] = []
 
@@ -47,9 +47,9 @@ class RecordRead(BaseModel):
     user_id: uuid.UUID
     title: Optional[str] = None
     content: str
-    location: str
-    category: str
-    date: datetime.date
+    location: Optional[str] = None
+    category: Optional[str] = None
+    date: Optional[datetime.date] = None
     share_code: Optional[str] = None
     tags: List[str] = []
     images: List[RecordImageRead] = []
@@ -63,9 +63,9 @@ class RecordListRead(BaseModel):
     id: uuid.UUID
     title: Optional[str] = None
     content_preview: str = ""
-    location: str
-    category: str
-    date: datetime.date
+    location: Optional[str] = None
+    category: Optional[str] = None
+    date: Optional[datetime.date] = None
     tags: List[str] = []
     images: List[RecordImageRead] = []
     created_at: datetime.datetime

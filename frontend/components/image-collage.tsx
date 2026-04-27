@@ -7,48 +7,26 @@ interface ImageCollageProps {
 }
 
 export function ImageCollage({ images, className }: ImageCollageProps) {
-  const count = images.length;
-  if (count === 0) return null;
+  if (images.length === 0) return null;
 
   return (
-    <div className={cn('relative aspect-square w-full rounded-2xl overflow-hidden', className)}>
-      {count === 1 && (
-        <Image src={images[0]} alt="" fill className="object-cover" />
+    <div 
+      className={cn(
+        'flex overflow-x-auto snap-x snap-mandatory rounded-2xl gap-2 [&::-webkit-scrollbar]:hidden w-full',
+        className
       )}
-
-      {count === 2 && (
-        <div className="grid grid-cols-2 gap-0.5 w-full h-full">
-          {images.map((img, i) => (
-            <div key={i} className="relative w-full h-full">
-              <Image src={img} alt="" fill className="object-cover" />
-            </div>
-          ))}
+      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+    >
+      {images.map((src, index) => (
+        <div key={index} className="relative flex-none w-full snap-center rounded-2xl overflow-hidden leading-none">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={`Image ${index + 1}`}
+            className="w-full h-auto object-contain"
+          />
         </div>
-      )}
-
-      {count === 3 && (
-        <div className="grid grid-cols-2 grid-rows-2 gap-0.5 w-full h-full">
-          <div className="relative row-span-2">
-            <Image src={images[0]} alt="" fill className="object-cover" />
-          </div>
-          <div className="relative">
-            <Image src={images[1]} alt="" fill className="object-cover" />
-          </div>
-          <div className="relative">
-            <Image src={images[2]} alt="" fill className="object-cover" />
-          </div>
-        </div>
-      )}
-
-      {count >= 4 && (
-        <div className="grid grid-cols-2 grid-rows-2 gap-0.5 w-full h-full">
-          {images.slice(0, 4).map((img, i) => (
-            <div key={i} className="relative w-full h-full">
-              <Image src={img} alt="" fill className="object-cover" />
-            </div>
-          ))}
-        </div>
-      )}
+      ))}
     </div>
   );
 }

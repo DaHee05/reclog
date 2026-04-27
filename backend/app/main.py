@@ -11,6 +11,7 @@ from app.routers import health
 from app.routers import records
 from app.routers import categories
 from app.routers import upload
+from app.routers import photobooks
 
 settings = get_settings()
 
@@ -51,3 +52,4 @@ app.include_router(health.router)
 app.include_router(records.router)
 app.include_router(categories.router)
 app.include_router(upload.router)
+app.include_router(photobooks.router)

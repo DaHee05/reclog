@@ -131,58 +131,85 @@ export default function RecordDetailPage({
         {/* Image Gallery */}
         {record.images.length > 0 && (
           <div className="px-5 mb-5">
-            <div className="relative aspect-[4/3] rounded-2xl overflow-hidden">
-              <Image
-                src={record.images[currentImageIndex]}
-                alt={`기록 이미지 ${currentImageIndex + 1}`}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 512px"
-                priority
-              />
-              {record.images.length > 1 && (
-                <>
-                  <button onClick={prevImage} className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-background/80 backdrop-blur-sm text-foreground hover:bg-background transition-colors">
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <button onClick={nextImage} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-background/80 backdrop-blur-sm text-foreground hover:bg-background transition-colors">
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                    {record.images.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setCurrentImageIndex(index)}
-                        className={cn('w-2 h-2 rounded-full transition-colors', currentImageIndex === index ? 'bg-primary' : 'bg-background/60')}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
+            <div
+              className="flex overflow-x-auto snap-x snap-mandatory rounded-2xl [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              onScroll={(e) => {
+                const target = e.currentTarget;
+                // 스크롤 위치에 따라 현재 보이는 이미지 인덱스 계산
+                const index = Math.round(target.scrollLeft / target.clientWidth);
+                if (index !== currentImageIndex) {
+                  setCurrentImageIndex(index);
+                }
+              }}
+            >
+              {record.images.map((src, index) => (
+                <div key={index} className="relative flex-none w-full aspect-[4/3] snap-center">
+                  <Image
+                    src={src}
+                    alt={`기록 이미지 ${index + 1}`}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 512px"
+                    priority={index === 0}
+                  />
+                </div>
+              ))}
             </div>
+
+            {/* Pagination Dots */}
+            {record.images.length > 1 && (
+              <div className="flex justify-center gap-1.5 mt-3">
+                {record.images.map((_, index) => (
+                  <div
+                    key={index}
+                    className={cn(
+                      'w-2 h-2 rounded-full transition-colors duration-300',
+                      currentImageIndex === index ? 'bg-primary' : 'bg-muted'
+                    )}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* Content */}
-        <main className="px-5">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xl">{categoryEmoji[record.category] || '📝'}</span>
-            <span className="text-sm text-muted-foreground">{formattedDate}</span>
+        <main className="px-5 pt-2">
+          {/* Pseudo-Author & Location */}
+          <div className="mb-2 flex items-center gap-1.5">
+            <span className="font-semibold text-[14px] text-foreground">
+              {categoryEmoji[record.category]} {record.category === 'travel' ? '여행 기록' : '일상 기록'}
+            </span>
+            {record.location && (
+              <>
+                <span className="text-[14px] text-muted-foreground">·</span>
+                <span className="text-[14px] text-foreground">{record.location}</span>
+              </>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 text-muted-foreground mb-5">
-            <MapPin className="h-4 w-4" />
-            <span className="text-sm">{record.location}</span>
+          {/* Body */}
+          <div className="mb-1">
+            <p className="text-[14px] text-foreground leading-[1.6] whitespace-pre-wrap">
+              {record.content}
+            </p>
           </div>
 
-          <div className="flex flex-wrap gap-2 mb-6">
-            {record.tags.map((tag) => (
-              <span key={tag} className="text-sm text-primary bg-card px-3 py-1.5 rounded-full">{tag}</span>
-            ))}
-          </div>
+          {/* Hashtags */}
+          {record.tags.length > 0 && (
+            <div className="flex flex-wrap gap-x-1.5 mb-3">
+              {record.tags.map((tag) => (
+                <span key={tag} className="text-[14px] text-primary/80 font-medium">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
 
-          <div className="bg-card rounded-2xl p-5">
-            <p className="text-foreground leading-relaxed whitespace-pre-wrap">{record.content}</p>
+          {/* Date */}
+          <div className="text-[11px] text-muted-foreground mb-8 uppercase tracking-wider">
+            {formattedDate}
           </div>
         </main>
 

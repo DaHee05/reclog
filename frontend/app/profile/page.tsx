@@ -18,7 +18,7 @@ import { fetchRecords } from '@/lib/api';
 import type { TravelRecord } from '@/lib/types';
 
 const menuItems = [
-  { icon: Bell, label: '알림 설정', href: '/profile/notifications' },
+  { icon: Bell, label: '포토북 주문 내역', href: '/photobook' },
   { icon: Globe, label: '언어', href: '/profile/language', value: '한국어' },
   { icon: HelpCircle, label: '도움말', href: '/profile/help' },
 ];
@@ -103,7 +103,9 @@ export default function ProfilePage() {
               <div className="flex-1">
                 <h3 className="font-bold text-lg text-foreground">포토북 만들기</h3>
                 <p className="text-sm text-muted-foreground mt-0.5 mb-3">쌓인 기록을 예쁜 포토북으로 만들어 보세요</p>
-                <Button size="sm" className="rounded-full">시작하기</Button>
+                <Button size="sm" className="rounded-full" asChild>
+                  <Link href="/photobook/new">시작하기</Link>
+                </Button>
               </div>
             </div>
           </div>
