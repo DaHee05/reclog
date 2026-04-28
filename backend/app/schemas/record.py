@@ -30,6 +30,7 @@ class RecordCreate(BaseModel):
     date: Optional[datetime.date] = None
     tags: List[str] = Field(default=[], max_length=10)
     images: List[RecordImageCreate] = Field(default=[], max_length=4)
+    space_id: Optional[uuid.UUID] = None
 
 
 class RecordUpdate(BaseModel):

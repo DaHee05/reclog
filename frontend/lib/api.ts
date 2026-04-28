@@ -64,6 +64,33 @@ function toTravelRecord(api: ApiRecord): TravelRecord {
   };
 }
 
+// --- Users ---
+export interface UserProfile {
+  id: string;
+  email: string;
+  nickname: string;
+  avatar_url: string | null;
+  created_at: string;
+}
+
+export async function fetchMe(): Promise<UserProfile> {
+  const res = await authFetch(`${API_URL}/api/users/me`, {
+    headers: { ...await authHeaders() },
+  });
+  if (!res.ok) throw new Error('Failed to fetch user');
+  return res.json();
+}
+
+export async function updateProfile(data: { nickname?: string; avatar_url?: string; delete_avatar?: boolean }): Promise<UserProfile> {
+  const res = await authFetch(`${API_URL}/api/users/me`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update profile');
+  return res.json();
+}
+
 // --- Records ---
 export interface PaginatedRecords {
   items: TravelRecord[];
@@ -108,6 +135,29 @@ export async function fetchAllRecords(category?: string): Promise<TravelRecord[]
   return data.items.map((r: ApiRecord) => toTravelRecord(r));
 }
 
+export async function fetchRecordsByMonth(year: number, month: number): Promise<TravelRecord[]> {
+  const params = new URLSearchParams();
+  params.set('year', String(year));
+  params.set('month', String(month));
+  params.set('size', '100');
+
+  const res = await authFetch(`${API_URL}/api/records?${params}`, {
+    headers: { ...await authHeaders() },
+  });
+  if (!res.ok) throw new Error('Failed to fetch records');
+
+  const data = await res.json();
+  return data.items.map((r: ApiRecord) => toTravelRecord(r));
+}
+
+export async function fetchRecordStats() {
+  const res = await authFetch(`${API_URL}/api/records/stats`, {
+    headers: { ...await authHeaders() },
+  });
+  if (!res.ok) throw new Error('Failed to fetch stats');
+  return res.json();
+}
+
 export async function fetchRecord(id: string): Promise<TravelRecord | null> {
   const res = await authFetch(`${API_URL}/api/records/${id}`, {
     headers: { ...await authHeaders() },
@@ -127,6 +177,7 @@ export async function createRecord(record: {
   date: string;
   tags: string[];
   images: { image_url: string; is_primary: boolean; order: number }[];
+  space_id?: string;
 }): Promise<TravelRecord> {
   const res = await authFetch(`${API_URL}/api/records`, {
     method: 'POST',
@@ -182,11 +233,29 @@ export async function fetchCategories(): Promise<ApiCategory[]> {
   return res.json();
 }
 
-export async function createCategory(name: string, emoji: string): Promise<ApiCategory> {
+export async function updateCategory(id: string, name?: string): Promise<ApiCategory> {
+  const res = await authFetch(`${API_URL}/api/categories/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error('Failed to update category');
+  return res.json();
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  const res = await authFetch(`${API_URL}/api/categories/${id}`, {
+    method: 'DELETE',
+    headers: { ...await authHeaders() },
+  });
+  if (!res.ok) throw new Error('Failed to delete category');
+}
+
+export async function createCategory(name: string): Promise<ApiCategory> {
   const res = await authFetch(`${API_URL}/api/categories`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...await authHeaders() },
-    body: JSON.stringify({ name, emoji }),
+    body: JSON.stringify({ name }),
   });
   if (!res.ok) throw new Error('Failed to create category');
   return res.json();
@@ -220,6 +289,11 @@ export async function generateOverlay(file: File, tags?: string): Promise<string
     body: formData,
   });
   if (!res.ok) {
+    if (res.status === 403) {
+      const error = new Error('LIMIT_EXCEEDED') as Error & { status: number };
+      error.status = 403;
+      throw error;
+    }
     const err = await res.text();
     throw new Error(`이미지 생성 실패: ${err}`);
   }
@@ -271,5 +345,79 @@ export async function updatePhotobookStatus(id: string, status: PhotobookOrder['
     body: JSON.stringify({ status }),
   });
   if (!res.ok) throw new Error('Failed to update photobook status');
+  return res.json();
+}
+
+// --- Shared Spaces ---
+export interface SharedSpace {
+  id: string;
+  owner_id: string;
+  category_name: string;
+  category_emoji: string;
+  code: string;
+  member_count: number;
+  created_at: string;
+}
+
+export interface SpaceRecord {
+  id: string;
+  user_id: string;
+  poster_nickname: string;
+  title: string | null;
+  content: string;
+  content_preview: string;
+  location: string | null;
+  category: string | null;
+  date: string | null;
+  tags: string[];
+  images: { id: string; image_url: string; is_primary: boolean; order: number }[];
+  created_at: string;
+  updated_at: string;
+}
+
+export async function createSharedSpace(category_name: string, category_emoji: string): Promise<SharedSpace> {
+  const res = await authFetch(`${API_URL}/api/spaces`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    body: JSON.stringify({ category_name, category_emoji }),
+  });
+  if (!res.ok) throw new Error('Failed to create shared space');
+  return res.json();
+}
+
+export async function joinSharedSpace(code: string): Promise<SharedSpace> {
+  const res = await authFetch(`${API_URL}/api/spaces/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    body: JSON.stringify({ code }),
+  });
+  if (res.status === 404) throw Object.assign(new Error('NOT_FOUND'), { status: 404 });
+  if (res.status === 409) throw Object.assign(new Error('ALREADY_JOINED'), { status: 409 });
+  if (!res.ok) throw new Error('Failed to join shared space');
+  return res.json();
+}
+
+export async function fetchMySpaces(): Promise<SharedSpace[]> {
+  const res = await authFetch(`${API_URL}/api/spaces`, {
+    headers: { ...await authHeaders() },
+  });
+  if (!res.ok) throw new Error('Failed to fetch spaces');
+  return res.json();
+}
+
+export async function fetchSpace(spaceId: string): Promise<SharedSpace> {
+  const res = await authFetch(`${API_URL}/api/spaces/${spaceId}`, {
+    headers: { ...await authHeaders() },
+  });
+  if (!res.ok) throw new Error('Failed to fetch space');
+  return res.json();
+}
+
+export async function fetchSpaceRecords(spaceId: string, page = 1, size = 10): Promise<{ items: SpaceRecord[]; total: number; page: number; size: number; total_pages: number }> {
+  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  const res = await authFetch(`${API_URL}/api/spaces/${spaceId}/records?${params}`, {
+    headers: { ...await authHeaders() },
+  });
+  if (!res.ok) throw new Error('Failed to fetch space records');
   return res.json();
 }

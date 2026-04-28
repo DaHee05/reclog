@@ -4,18 +4,12 @@ import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
-import { Plus, ChevronDown, List, Grid3X3, Search, Users, Copy, Check, X, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { Plus, ChevronDown, List, Grid3X3, Search, X, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { BottomNav } from '@/components/bottom-nav';
 import { ImageCollage } from '@/components/image-collage';
 import { fetchRecords, type PaginatedRecords } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type { Category, TravelRecord } from '@/lib/types';
 
@@ -29,15 +23,6 @@ const VIEW_TABS = [
   { id: 'feed', label: '피드', icon: List },
   { id: 'calendar', label: '달력', icon: Grid3X3 },
 ];
-
-function generateShareCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-}
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -197,12 +182,6 @@ export default function CategoryRecordsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Share modal state
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [shareCode, setShareCode] = useState('');
-  const [joinCode, setJoinCode] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [shareTab, setShareTab] = useState<'create' | 'join'>('create');
 
   const loadRecords = async (page = 1) => {
     setRecordsLoading(true);
@@ -224,21 +203,6 @@ export default function CategoryRecordsPage() {
     loadRecords(1);
   }, [category]);
 
-  const handleGenerateCode = () => setShareCode(generateShareCode());
-
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(shareCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleJoinWithCode = () => {
-    if (joinCode.trim().length === 6) {
-      alert(`코드 "${joinCode}"로 공유 공간에 참여했습니다!`);
-      setJoinCode('');
-      setShowShareModal(false);
-    }
-  };
 
   const filteredRecords = useMemo(() => {
     let result = [...records];
@@ -271,9 +235,6 @@ export default function CategoryRecordsPage() {
               <div className="flex items-center gap-2">
                 <button onClick={() => setShowSearch(!showSearch)} className="flex items-center justify-center w-10 h-10 rounded-full border border-border bg-card hover:bg-muted transition-colors">
                   <Search className="h-5 w-5 text-foreground" />
-                </button>
-                <button onClick={() => setShowShareModal(true)} className="flex items-center justify-center w-10 h-10 rounded-full border border-border bg-card hover:bg-muted transition-colors">
-                  <Users className="h-5 w-5 text-foreground" />
                 </button>
                 <Link href={`/record/new?category=${category}`} className="flex items-center justify-center w-10 h-10 rounded-full border border-border bg-card hover:bg-muted transition-colors">
                   <Plus className="h-5 w-5 text-foreground" />
@@ -378,51 +339,6 @@ export default function CategoryRecordsPage() {
         <BottomNav />
       </div>
 
-      {/* Share Modal */}
-      <Dialog open={showShareModal} onOpenChange={setShowShareModal}>
-        <DialogContent className="max-w-sm rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-center">친구와 공유하기</DialogTitle>
-          </DialogHeader>
-
-          <div className="flex gap-2 p-1 bg-muted rounded-xl">
-            <button onClick={() => setShareTab('create')} className={cn('flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all', shareTab === 'create' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}>
-              코드 생성
-            </button>
-            <button onClick={() => setShareTab('join')} className={cn('flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all', shareTab === 'join' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}>
-              코드 입력
-            </button>
-          </div>
-
-          {shareTab === 'create' ? (
-            <div className="space-y-4 pt-2">
-              <p className="text-sm text-muted-foreground text-center">
-                코드를 생성하여 친구에게 공유하세요.<br />코드를 가진 사람은 기록을 보고 작성할 수 있습니다.
-              </p>
-              {shareCode ? (
-                <div className="space-y-3">
-                  <div className="bg-muted rounded-xl p-4 text-center">
-                    <p className="text-3xl font-bold tracking-widest text-primary">{shareCode}</p>
-                  </div>
-                  <Button onClick={handleCopyCode} variant="outline" className="w-full rounded-full h-12 gap-2">
-                    {copied ? (<><Check className="h-4 w-4" />복사됨!</>) : (<><Copy className="h-4 w-4" />코드 복사하기</>)}
-                  </Button>
-                </div>
-              ) : (
-                <Button onClick={handleGenerateCode} className="w-full rounded-full h-12">공유 코드 생성하기</Button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4 pt-2">
-              <p className="text-sm text-muted-foreground text-center">
-                친구에게 받은 6자리 코드를 입력하세요.<br />공유 공간에 참여하여 함께 기록할 수 있습니다.
-              </p>
-              <Input placeholder="코드 6자리 입력" value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} maxLength={6} className="bg-muted border-0 rounded-xl h-14 text-center text-2xl tracking-widest font-bold" />
-              <Button onClick={handleJoinWithCode} disabled={joinCode.length !== 6} className="w-full rounded-full h-12">참여하기</Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

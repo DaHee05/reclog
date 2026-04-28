@@ -24,12 +24,15 @@ export default function NewRecordPage() {
   const [saving, setSaving] = useState(false);
   const [savingMessage, setSavingMessage] = useState('');
   const [enableOverlay, setEnableOverlay] = useState(false);
+  const [spaceId, setSpaceId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const categoryParam = searchParams.get('category');
     if (categoryParam && categoryParam !== 'all') {
       setCategory(categoryParam);
     }
+    const spaceIdParam = searchParams.get('spaceId');
+    if (spaceIdParam) setSpaceId(spaceIdParam);
   }, [searchParams]);
 
   const [location, setLocation] = useState('');
@@ -118,11 +121,16 @@ export default function NewRecordPage() {
           is_primary: i === primaryImageIndex,
           order: i,
         })),
+        space_id: spaceId,
       });
 
-      router.push('/');
-    } catch (e) {
+      router.push(spaceId ? `/spaces/${spaceId}` : '/');
+    } catch (e: unknown) {
       console.error(e);
+      if (e instanceof Error && (e as Error & { status?: number }).status === 403) {
+        router.push('/subscribe');
+        return;
+      }
       alert('저장에 실패했습니다.');
     } finally {
       setSaving(false);

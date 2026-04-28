@@ -7,7 +7,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.database import engine, Base
-from app.models import User, Record, RecordImage, RecordTag, Category  # noqa: F401
+from app.models import User, Record, RecordImage, RecordTag, Category, AiUsage, SharedSpace, SharedSpaceMember  # noqa: F401
 from app.routers import health
 from app.routers import records
 from app.routers import categories
@@ -16,6 +16,7 @@ from app.routers import photobooks
 from app.routers import users
 from app.routers import generate
 from app.routers import places
+from app.routers import spaces
 
 settings = get_settings()
 
@@ -52,3 +53,4 @@ app.include_router(photobooks.router)
 app.include_router(users.router)
 app.include_router(generate.router)
 app.include_router(places.router)
+app.include_router(spaces.router)

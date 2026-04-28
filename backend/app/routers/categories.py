@@ -10,13 +10,13 @@ from app.dependencies import get_current_user
 from app.models.category import Category
 from app.models.record import Record
 from app.models.user import User
-from app.schemas.category import CategoryCreate, CategoryRead
+from app.schemas.category import CategoryCreate, CategoryRead, CategoryUpdate
 
 router = APIRouter(prefix="/api/categories", tags=["categories"])
 
 DEFAULT_CATEGORIES = [
-    {"name": "travel", "emoji": "✈️"},
-    {"name": "daily", "emoji": "📖"},
+    {"name": "travel"},
+    {"name": "daily"},
 ]
 
 
@@ -32,7 +32,7 @@ async def _ensure_defaults(db: AsyncSession, user_id: uuid.UUID) -> None:
             db.add(Category(
                 user_id=user_id,
                 name=cat["name"],
-                emoji=cat["emoji"],
+                emoji="",
                 is_default=True,
             ))
         await db.commit()
@@ -91,7 +91,7 @@ async def create_category(
     category = Category(
         user_id=current_user.id,
         name=body.name,
-        emoji=body.emoji,
+        emoji="",
         is_default=False,
     )
     db.add(category)
@@ -104,6 +104,53 @@ async def create_category(
         emoji=category.emoji,
         is_default=category.is_default,
         record_count=0,
+        created_at=category.created_at,
+    )
+
+
+@router.patch("/{category_id}", response_model=CategoryRead)
+async def update_category(
+    category_id: uuid.UUID,
+    body: CategoryUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Category).where(
+            Category.id == category_id, Category.user_id == current_user.id
+        )
+    )
+    category = result.scalar_one_or_none()
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    if body.name and body.name != category.name:
+        if category.is_default:
+            raise HTTPException(status_code=400, detail="기본 카테고리의 이름은 변경할 수 없습니다")
+        from app.models.record import Record
+        from sqlalchemy import update as sa_update
+        await db.execute(
+            sa_update(Record)
+            .where(Record.user_id == current_user.id, Record.category == category.name)
+            .values(category=body.name)
+        )
+        category.name = body.name
+
+    await db.commit()
+    await db.refresh(category)
+
+    count = (await db.execute(
+        select(func.count(Record.id)).where(
+            Record.user_id == current_user.id, Record.category == category.name
+        )
+    )).scalar() or 0
+
+    return CategoryRead(
+        id=category.id,
+        name=category.name,
+        emoji=category.emoji,
+        is_default=category.is_default,
+        record_count=count,
         created_at=category.created_at,
     )
 

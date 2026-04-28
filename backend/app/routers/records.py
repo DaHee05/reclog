@@ -2,13 +2,14 @@ import uuid
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func, delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.record import Record, RecordImage, RecordTag
+from app.models.shared_space import SharedSpaceMember
 from app.models.user import User
 from app.schemas.record import (
     RecordCreate,
@@ -42,6 +43,16 @@ async def create_record(
     if not body.content or not body.content.strip():
         raise HTTPException(status_code=422, detail="내용을 입력해주세요.")
 
+    if body.space_id:
+        member = (await db.execute(
+            select(SharedSpaceMember).where(
+                SharedSpaceMember.space_id == body.space_id,
+                SharedSpaceMember.user_id == current_user.id,
+            )
+        )).scalar_one_or_none()
+        if not member:
+            raise HTTPException(status_code=403, detail="해당 공유 공간의 멤버가 아닙니다")
+
     record = Record(
         user_id=current_user.id,
         title=body.title,
@@ -49,6 +60,7 @@ async def create_record(
         location=body.location,
         category=body.category,
         date=body.date,
+        space_id=body.space_id,
     )
 
     for img in body.images:
@@ -72,13 +84,13 @@ async def list_records(
     year: Optional[int] = Query(None),
     month: Optional[int] = Query(None),
     page: int = Query(1, ge=1),
-    size: int = Query(5, ge=1, le=50),
+    size: int = Query(5, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     stmt = (
         select(Record)
-        .where(Record.user_id == current_user.id)
+        .where(Record.user_id == current_user.id, Record.space_id.is_(None))
         .options(selectinload(Record.images), selectinload(Record.tags))
         .order_by(Record.date.desc())
     )
@@ -105,6 +117,59 @@ async def list_records(
         "page": page,
         "size": size,
         "total_pages": (total + size - 1) // size,
+    }
+
+
+@router.get("/stats")
+async def get_record_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    uid = current_user.id
+
+    # 총 기록 수 + 고유 장소 수
+    total_row = (await db.execute(
+        select(
+            func.count(Record.id).label("total"),
+            func.count(func.distinct(Record.location)).label("unique_locations"),
+        ).where(Record.user_id == uid)
+    )).one()
+
+    # 카테고리별 수
+    cat_rows = (await db.execute(
+        select(Record.category, func.count(Record.id).label("cnt"))
+        .where(Record.user_id == uid)
+        .group_by(Record.category)
+    )).all()
+
+    # 최근 6개월 월별 수
+    monthly_rows = (await db.execute(
+        select(
+            func.to_char(Record.date, "YYYY-MM").label("month"),
+            func.count(Record.id).label("cnt"),
+        )
+        .where(Record.user_id == uid)
+        .group_by(text("1"))
+        .order_by(text("1"))
+    )).all()
+    monthly_rows = monthly_rows[-6:]
+
+    # 태그별 수 (상위 5개)
+    tag_rows = (await db.execute(
+        select(RecordTag.tag_name, func.count(RecordTag.id).label("cnt"))
+        .join(Record, Record.id == RecordTag.record_id)
+        .where(Record.user_id == uid)
+        .group_by(RecordTag.tag_name)
+        .order_by(func.count(RecordTag.id).desc())
+        .limit(5)
+    )).all()
+
+    return {
+        "total_records": total_row.total,
+        "unique_locations": total_row.unique_locations,
+        "category_counts": [{"category": r.category, "count": r.cnt} for r in cat_rows],
+        "monthly_counts": [{"month": r.month, "count": r.cnt} for r in monthly_rows],
+        "top_tags": [{"tag": r.tag_name, "count": r.cnt} for r in tag_rows],
     }
 
 

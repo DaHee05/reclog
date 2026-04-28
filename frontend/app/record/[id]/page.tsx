@@ -144,13 +144,14 @@ export default function RecordDetailPage({
               }}
             >
               {record.images.map((src, index) => (
-                <div key={index} className="relative flex-none w-full aspect-[4/3] snap-center">
+                <div key={index} className="flex-none w-full snap-center">
                   <Image
                     src={src}
                     alt={`기록 이미지 ${index + 1}`}
-                    fill
-                    className="object-cover"
+                    width={0}
+                    height={0}
                     sizes="(max-width: 768px) 100vw, 512px"
+                    className="w-full h-auto"
                     priority={index === 0}
                   />
                 </div>
@@ -201,7 +202,7 @@ export default function RecordDetailPage({
             <div className="flex flex-wrap gap-x-1.5 mb-3">
               {record.tags.map((tag) => (
                 <span key={tag} className="text-[14px] text-primary/80 font-medium">
-                  #{tag}
+                  {tag}
                 </span>
               ))}
             </div>

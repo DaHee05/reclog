@@ -28,6 +28,9 @@ class Record(Base):
     category: Mapped[Optional[str]] = mapped_column(String(50), index=True)
     date: Mapped[Optional[date]] = mapped_column(Date, index=True)
     share_code: Mapped[Optional[str]] = mapped_column(String(10), unique=True)
+    space_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("shared_spaces.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )

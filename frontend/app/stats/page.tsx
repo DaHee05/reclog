@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { BottomNav } from '@/components/bottom-nav';
-import { fetchAllRecords } from '@/lib/api';
-import type { TravelRecord, Category } from '@/lib/types';
+import { fetchRecordStats } from '@/lib/api';
 import {
   BarChart,
   Bar,
@@ -38,48 +37,37 @@ const CATEGORY_COLORS: Record<string, string> = {
 const CHART_PRIMARY = '#2dd4bf';
 
 export default function StatsPage() {
-  const [records, setRecords] = useState<TravelRecord[]>([]);
+  const [stats, setStats] = useState({
+    totalRecords: 0,
+    uniqueLocations: 0,
+    topTags: [] as [string, number][],
+    monthlyData: [] as { month: string; count: number }[],
+    categoryData: [] as { id: string; name: string; emoji: string; value: number; color: string }[],
+  });
 
   useEffect(() => {
-    fetchAllRecords().then(setRecords).catch(console.error);
-  }, []);
-
-  const stats = useMemo(() => {
-    const totalRecords = records.length;
-    const uniqueLocations = new Set(records.map((r) => r.location)).size;
-
-    const tagCounts: Record<string, number> = {};
-    records.forEach((record) => {
-      record.tags.forEach((tag) => {
-        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+    fetchRecordStats().then((data) => {
+      const monthlyData = data.monthly_counts.map(({ month, count }: { month: string; count: number }) => {
+        const [, monthNum] = month.split('-');
+        return { month: `${parseInt(monthNum)}월`, count };
       });
-    });
-    const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-    const monthlyRecords: Record<string, number> = {};
-    records.forEach((record) => {
-      const month = record.date.substring(0, 7);
-      monthlyRecords[month] = (monthlyRecords[month] || 0) + 1;
-    });
-    const sortedMonths = Object.keys(monthlyRecords).sort();
-    const monthlyData = sortedMonths.slice(-6).map((month) => {
-      const [, monthNum] = month.split('-');
-      return { month: `${parseInt(monthNum)}월`, count: monthlyRecords[month] };
-    });
-
-    const categoryCounts: Record<string, number> = {};
-    records.forEach((record) => {
-      categoryCounts[record.category] = (categoryCounts[record.category] || 0) + 1;
-    });
-    const categoryData = Object.keys(categoryCounts).map((cat) => ({
-      name: categoryLabel[cat] || cat,
-      emoji: categoryEmoji[cat] || '📝',
-      value: categoryCounts[cat],
-      color: CATEGORY_COLORS[cat] || '#94a3b8',
-    }));
-
-    return { totalRecords, uniqueLocations, topTags, monthlyData, categoryData };
-  }, [records]);
+      const categoryData = data.category_counts.map(({ category, count }: { category: string; count: number }) => ({
+        id: category,
+        name: categoryLabel[category] || category,
+        emoji: categoryEmoji[category] || '📝',
+        value: count,
+        color: CATEGORY_COLORS[category] || '#94a3b8',
+      }));
+      const topTags: [string, number][] = data.top_tags.map(({ tag, count }: { tag: string; count: number }) => [tag, count]);
+      setStats({
+        totalRecords: data.total_records,
+        uniqueLocations: data.unique_locations,
+        topTags,
+        monthlyData,
+        categoryData,
+      });
+    }).catch(console.error);
+  }, []);
 
   const chartConfig = {
     count: { label: '기록 수', color: CHART_PRIMARY },
@@ -158,7 +146,7 @@ export default function StatsPage() {
                 </ChartContainer>
                 <div className="flex-1 space-y-2">
                   {stats.categoryData.map((cat) => (
-                    <div key={cat.name} className="flex items-center gap-2">
+                    <div key={cat.id} className="flex items-center gap-2">
                       <span className="text-base">{cat.emoji}</span>
                       <span className="text-sm text-foreground flex-1">{cat.name}</span>
                       <span className="text-sm text-muted-foreground">{cat.value}개</span>
