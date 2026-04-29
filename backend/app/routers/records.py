@@ -16,7 +16,6 @@ from app.schemas.record import (
     RecordCreate,
     RecordUpdate,
     RecordRead,
-    RecordListRead,
 )
 
 router = APIRouter(prefix="/api/records", tags=["records"])

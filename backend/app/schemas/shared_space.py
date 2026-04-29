@@ -1,7 +1,5 @@
 import uuid
 from datetime import datetime
-from typing import List
-
 from pydantic import BaseModel
 
 
@@ -28,19 +26,3 @@ class SharedSpaceUpdate(BaseModel):
 
 class JoinSpaceRequest(BaseModel):
     code: str
-
-
-class SpaceRecordRead(BaseModel):
-    id: uuid.UUID
-    user_id: uuid.UUID
-    poster_nickname: str
-    title: str | None = None
-    content: str
-    content_preview: str = ""
-    location: str | None = None
-    category: str | None = None
-    date: str | None = None
-    tags: List[str] = []
-    images: List[dict] = []
-    created_at: datetime
-    updated_at: datetime
