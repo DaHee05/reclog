@@ -24,9 +24,11 @@
 ### 사전 준비
 
 `.env.example`을 복사하여 `.env`를 생성하고 각 값을 채워 주세요.
+`.env`는 메일로 별도 제출했습니다.
 
 ```bash
 cp .env.example .env
+docker compose up --build
 ```
 
 필수 환경 변수:
@@ -43,10 +45,6 @@ cp .env.example .env
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 프론트엔드용 anon key |
 
 ### 실행
-
-```bash
-docker compose up --build
-```
 
 - 백엔드: `http://localhost:8000`
 - 프론트엔드: `http://localhost:3000`
