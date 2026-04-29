@@ -33,19 +33,6 @@ cp .env.example .env
 docker compose up --build
 ```
 
-필수 환경 변수:
-
-| 변수명 | 설명 |
-|---|---|
-| `SUPABASE_URL` | Supabase 프로젝트 URL |
-| `SUPABASE_KEY` | Supabase anon key |
-| `SUPABASE_SERVICE_KEY` | Supabase service role key |
-| `SUPABASE_JWT_SECRET` | Supabase JWT secret (ES256 JWKS 자동 캐시) |
-| `OPENAI_API_KEY` | OpenAI API 키 (AI 포토북용) |
-| `KAKAO_REST_API_KEY` | 카카오 지도 주소 검색용 |
-| `NEXT_PUBLIC_SUPABASE_URL` | 프론트엔드용 Supabase URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 프론트엔드용 anon key |
-
 ### 실행
 
 - 백엔드: `http://localhost:8000`
@@ -58,6 +45,8 @@ docker compose up --build
 ```env
 BACKEND_PORT=9000
 FRONTEND_PORT=4000
+NEXT_PUBLIC_API_URL=http://localhost:9000
+FRONTEND_URL=http://localhost:4000
 ```
 
 ### 테스트 계정
