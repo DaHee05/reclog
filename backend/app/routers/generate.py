@@ -2,7 +2,7 @@ import uuid
 import base64
 import io
 from datetime import date
-from typing import Optional, List
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, HTTPException
 from PIL import Image

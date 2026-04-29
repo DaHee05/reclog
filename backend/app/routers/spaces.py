@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models.record import Record, RecordImage, RecordTag
+from app.models.record import Record
 from app.models.shared_space import SharedSpace, SharedSpaceMember
 from app.models.user import User
 from app.schemas.shared_space import SharedSpaceCreate, SharedSpaceRead, SharedSpaceUpdate, JoinSpaceRequest
