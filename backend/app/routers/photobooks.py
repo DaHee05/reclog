@@ -23,6 +23,7 @@ async def create_photobook_order(
         user_id=current_user.id,
         title=order_in.title,
         category=order_in.category,
+        space_id=order_in.space_id,
         start_date=order_in.start_date,
         end_date=order_in.end_date,
         status=PhotobookStatus.PENDING,

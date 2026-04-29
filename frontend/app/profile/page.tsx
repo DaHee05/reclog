@@ -23,25 +23,15 @@ import { useAuth } from '@/lib/auth-context';
 
 const menuItems = [
   { icon: Bell, label: '포토북 주문 내역', href: '/photobook' },
-  { icon: Globe, label: '언어', href: '/profile/language', value: '한국어' },
+  { icon: Globe, label: '구독', href: '/subscribe' },
 ];
 
-const categoryEmoji: Record<string, string> = {
-  travel: '✈️',
-  daily: '📖',
-};
-
-const categoryLabel: Record<string, string> = {
-  travel: '여행',
-  daily: '일상',
-};
 
 export default function ProfilePage() {
   const { signOut } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [totalRecords, setTotalRecords] = useState(0);
   const [uniqueLocations, setUniqueLocations] = useState(0);
-  const [categoryStats, setCategoryStats] = useState<Record<string, number>>({});
 
   // 편집 모달
   const [showEditModal, setShowEditModal] = useState(false);
@@ -57,11 +47,6 @@ export default function ProfilePage() {
     fetchRecordStats().then((data) => {
       setTotalRecords(data.total_records);
       setUniqueLocations(data.unique_locations);
-      const cats: Record<string, number> = {};
-      data.category_counts.forEach(({ category, count }: { category: string; count: number }) => {
-        cats[category] = count;
-      });
-      setCategoryStats(cats);
     }).catch(console.error);
   }, []);
 
@@ -119,12 +104,12 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto pb-24">
         <header className="px-5 pt-14 pb-6">
-          <h1 className="text-2xl font-bold text-primary tracking-tight italic">내 정보</h1>
+          <h1 className="text-2xl font-bold text-primary tracking-tight">내 정보</h1>
         </header>
 
         <main className="px-5 space-y-4">
           {/* Profile Card */}
-          <div className="bg-card rounded-2xl p-5">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5 border border-border shadow-sm shadow-stone-200/30">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary/30 bg-muted flex items-center justify-center flex-shrink-0">
                 {profile?.avatar_url ? (
@@ -160,20 +145,11 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                {Object.keys(categoryEmoji).map((cat) => (
-                  <div key={cat} className="text-center py-3 bg-muted/50 rounded-xl">
-                    <span className="text-lg">{categoryEmoji[cat]}</span>
-                    <p className="text-lg font-semibold text-foreground mt-1">{categoryStats[cat] || 0}</p>
-                    <p className="text-xs text-muted-foreground">{categoryLabel[cat]}</p>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
 
           {/* Photobook Banner */}
-          <div className="bg-card rounded-2xl p-5 border-2 border-primary/20">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5 border-2 border-primary/20 shadow-sm shadow-stone-200/30">
             <div className="flex items-start gap-4">
               <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-2xl">📚</div>
               <div className="flex-1">
@@ -187,7 +163,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Menu Items */}
-          <div className="bg-card rounded-2xl overflow-hidden">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl overflow-hidden border border-border shadow-sm shadow-stone-200/30">
             <button
               onClick={openEditModal}
               className="w-full flex items-center justify-between px-4 py-4 hover:bg-muted transition-colors border-b border-border"
@@ -208,10 +184,7 @@ export default function ProfilePage() {
                   <item.icon className="h-5 w-5 text-muted-foreground" />
                   <span className="text-foreground">{item.label}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {item.value && <span className="text-sm text-muted-foreground">{item.value}</span>}
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </Link>
             ))}
           </div>

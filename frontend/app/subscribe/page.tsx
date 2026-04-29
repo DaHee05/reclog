@@ -28,7 +28,7 @@ export default function SubscribePage() {
           <button onClick={() => router.back()} className="p-2 rounded-full hover:bg-card transition-colors">
             <ArrowLeft className="h-5 w-5 text-foreground" />
           </button>
-          <h1 className="text-2xl font-bold text-primary tracking-tight italic">구독</h1>
+          <h1 className="text-2xl font-bold text-primary tracking-tight">구독</h1>
         </header>
 
         <div className="text-center mb-8">
@@ -41,7 +41,7 @@ export default function SubscribePage() {
 
         <div className="grid gap-4">
           {/* 무료 플랜 */}
-          <div className="bg-card rounded-2xl p-5 border border-border">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5 border border-border shadow-sm shadow-stone-200/30">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-foreground">무료</h3>
               <span className="text-2xl font-bold text-foreground">₩0</span>
@@ -60,7 +60,7 @@ export default function SubscribePage() {
           </div>
 
           {/* 프로 플랜 */}
-          <div className="bg-card rounded-2xl p-5 border-2 border-primary relative">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5 border-2 border-primary relative shadow-md shadow-primary/10">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
               <span className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">추천</span>
             </div>

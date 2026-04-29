@@ -9,6 +9,7 @@ from app.models.photobook import PhotobookStatus
 class PhotobookOrderBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     category: Optional[str] = Field(None, max_length=50)
+    space_id: Optional[UUID] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
 

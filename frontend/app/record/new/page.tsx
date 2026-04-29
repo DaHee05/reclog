@@ -9,8 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { DEFAULT_TAGS } from '@/lib/types';
-import { createRecord, uploadImages, generateOverlay } from '@/lib/api';
+import { createRecord, uploadImages, generateOverlay, fetchCategories } from '@/lib/api';
 import { LocationSearch } from '@/components/location-search';
 
 export default function NewRecordPage() {
@@ -20,7 +19,7 @@ export default function NewRecordPage() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [category, setCategory] = useState('travel');
+  const [category, setCategory] = useState('');
   const [saving, setSaving] = useState(false);
   const [savingMessage, setSavingMessage] = useState('');
   const [enableOverlay, setEnableOverlay] = useState(false);
@@ -28,11 +27,16 @@ export default function NewRecordPage() {
 
   useEffect(() => {
     const categoryParam = searchParams.get('category');
-    if (categoryParam && categoryParam !== 'all') {
-      setCategory(categoryParam);
-    }
     const spaceIdParam = searchParams.get('spaceId');
     if (spaceIdParam) setSpaceId(spaceIdParam);
+
+    fetchCategories().then((cats) => {
+      if (categoryParam && categoryParam !== 'all') {
+        setCategory(categoryParam);
+      } else if (cats.length > 0) {
+        setCategory(cats[0].name);
+      }
+    }).catch(console.error);
   }, [searchParams]);
 
   const [location, setLocation] = useState('');
@@ -94,11 +98,10 @@ export default function NewRecordPage() {
       if (imageFiles.length > 0) {
         if (enableOverlay) {
           // 감성 메모 생성 모드: 각 이미지를 AI로 변환
-          const tagsStr = selectedTags.length > 0 ? selectedTags.join(' ') : undefined;
           const urls: string[] = [];
           for (let i = 0; i < imageFiles.length; i++) {
-            setSavingMessage(`감성 메모 생성 중... (${i + 1}/${imageFiles.length})`);
-            const url = await generateOverlay(imageFiles[i], tagsStr);
+            setSavingMessage(`손그림 생성 중... (${i + 1}/${imageFiles.length})`);
+            const url = await generateOverlay(imageFiles[i], undefined, content || undefined);
             urls.push(url);
           }
           imageUrls = urls;
@@ -208,12 +211,15 @@ export default function NewRecordPage() {
               <div className="flex items-center gap-2.5">
                 <Sparkles className="h-4 w-4 text-amber-500" />
                 <div>
-                  <p className="text-sm font-medium text-foreground">감성 손글씨 메모</p>
-                  <p className="text-xs text-muted-foreground">AI가 폴라로이드 스타일 메모를 그려요</p>
+                  <p className="text-sm font-medium text-foreground">손글씨 메모</p>
+                  <p className="text-xs text-muted-foreground">AI가 사진 위에 그림을 그려요</p>
                 </div>
               </div>
               <Switch checked={enableOverlay} onCheckedChange={setEnableOverlay} />
             </div>
+          )}
+          {enableOverlay && (
+            <p className="mt-1.5 px-1 text-[11px] text-muted-foreground">AI 처리를 위해 사진이 OpenAI 서버로 전송됩니다. 스위치를 켜면 이에 동의한 것으로 간주합니다.</p>
           )}
         </div>
 
@@ -240,29 +246,13 @@ export default function NewRecordPage() {
 
           <div>
             <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2.5 block">해시태그</label>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {DEFAULT_TAGS.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-sm transition-all',
-                    selectedTags.includes(tag)
-                      ? 'bg-foreground text-background'
-                      : 'bg-card border border-border/50 text-muted-foreground hover:text-foreground hover:border-foreground/20'
-                  )}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
             <div className="flex gap-2">
               <Input placeholder="태그 직접 입력" value={customTag} onChange={(e) => setCustomTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCustomTag()} className="bg-card border border-border/50 rounded-xl h-11 focus:border-primary transition-colors" />
               <Button variant="outline" onClick={addCustomTag} className="rounded-xl border-border/50">추가</Button>
             </div>
-            {selectedTags.filter((tag) => !DEFAULT_TAGS.includes(tag)).length > 0 && (
+            {selectedTags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3">
-                {selectedTags.filter((tag) => !DEFAULT_TAGS.includes(tag)).map((tag) => (
+                {selectedTags.map((tag) => (
                   <span key={tag} className="px-3 py-1.5 rounded-full text-sm bg-accent text-accent-foreground flex items-center gap-1">
                     {tag}
                     <button onClick={() => toggleTag(tag)} className="ml-1 hover:text-destructive"><X className="h-3 w-3" /></button>

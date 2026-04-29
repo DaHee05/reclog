@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -85,12 +86,14 @@ async def list_records(
     month: Optional[int] = Query(None),
     page: int = Query(1, ge=1),
     size: int = Query(5, ge=1, le=100),
+    include_shared: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    base = (Record.user_id == current_user.id,) if include_shared else (Record.user_id == current_user.id, Record.space_id.is_(None))
     stmt = (
         select(Record)
-        .where(Record.user_id == current_user.id, Record.space_id.is_(None))
+        .where(*base)
         .options(selectinload(Record.images), selectinload(Record.tags))
         .order_by(Record.date.desc())
     )
@@ -126,39 +129,46 @@ async def get_record_stats(
     current_user: User = Depends(get_current_user),
 ):
     uid = current_user.id
+    # 내가 올린 기록 전체 (공유 스페이스 포함)
+    base_filter = Record.user_id == uid
 
     # 총 기록 수 + 고유 장소 수
     total_row = (await db.execute(
         select(
             func.count(Record.id).label("total"),
             func.count(func.distinct(Record.location)).label("unique_locations"),
-        ).where(Record.user_id == uid)
+        ).where(base_filter)
     )).one()
 
     # 카테고리별 수
     cat_rows = (await db.execute(
         select(Record.category, func.count(Record.id).label("cnt"))
-        .where(Record.user_id == uid)
+        .where(base_filter)
         .group_by(Record.category)
     )).all()
 
-    # 최근 6개월 월별 수
+    # 최근 6개월 월별 수 — DB에서 범위 필터 후 집계
+    today = date.today()
+    m = today.month - 5
+    y = today.year + (m - 1) // 12
+    m = ((m - 1) % 12) + 1
+    six_months_start = date(y, m, 1)
+
     monthly_rows = (await db.execute(
         select(
             func.to_char(Record.date, "YYYY-MM").label("month"),
             func.count(Record.id).label("cnt"),
         )
-        .where(Record.user_id == uid)
+        .where(base_filter, Record.date >= six_months_start)
         .group_by(text("1"))
         .order_by(text("1"))
     )).all()
-    monthly_rows = monthly_rows[-6:]
 
     # 태그별 수 (상위 5개)
     tag_rows = (await db.execute(
         select(RecordTag.tag_name, func.count(RecordTag.id).label("cnt"))
         .join(Record, Record.id == RecordTag.record_id)
-        .where(Record.user_id == uid)
+        .where(base_filter)
         .group_by(RecordTag.tag_name)
         .order_by(func.count(RecordTag.id).desc())
         .limit(5)

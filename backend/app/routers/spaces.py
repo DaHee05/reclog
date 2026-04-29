@@ -13,11 +13,23 @@ from app.dependencies import get_current_user
 from app.models.record import Record, RecordImage, RecordTag
 from app.models.shared_space import SharedSpace, SharedSpaceMember
 from app.models.user import User
-from app.schemas.shared_space import SharedSpaceCreate, SharedSpaceRead, JoinSpaceRequest
+from app.schemas.shared_space import SharedSpaceCreate, SharedSpaceRead, SharedSpaceUpdate, JoinSpaceRequest
 
 router = APIRouter(prefix="/api/spaces", tags=["spaces"])
 
 CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+async def _require_member(db: AsyncSession, space_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """멤버 여부 확인 — 아니면 403"""
+    member = (await db.execute(
+        select(SharedSpaceMember).where(
+            SharedSpaceMember.space_id == space_id,
+            SharedSpaceMember.user_id == user_id,
+        )
+    )).scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=403, detail="접근 권한이 없습니다")
 
 
 async def _unique_code(db: AsyncSession) -> str:
@@ -104,22 +116,17 @@ async def list_my_spaces(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # 내가 속한 공유 공간 + 멤버 수 한 번에 조회
     stmt = (
-        select(SharedSpace)
+        select(SharedSpace, func.count(SharedSpaceMember.user_id).label("member_count"))
         .join(SharedSpaceMember, SharedSpaceMember.space_id == SharedSpace.id)
         .where(SharedSpaceMember.user_id == current_user.id)
+        .group_by(SharedSpace.id)
         .order_by(SharedSpace.created_at.desc())
     )
-    spaces = (await db.execute(stmt)).scalars().all()
+    rows = (await db.execute(stmt)).all()
 
-    result = []
-    for space in spaces:
-        count = (await db.execute(
-            select(func.count()).select_from(SharedSpaceMember).where(SharedSpaceMember.space_id == space.id)
-        )).scalar()
-        result.append(_space_to_dict(space, count))
-
-    return result
+    return [_space_to_dict(space, count) for space, count in rows]
 
 
 @router.get("/{space_id}")
@@ -128,15 +135,55 @@ async def get_space(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    member = (await db.execute(
-        select(SharedSpaceMember).where(
-            SharedSpaceMember.space_id == space_id,
-            SharedSpaceMember.user_id == current_user.id,
-        )
+    await _require_member(db, space_id, current_user.id)
+
+    row = (await db.execute(
+        select(SharedSpace, func.count(SharedSpaceMember.user_id).label("member_count"))
+        .join(SharedSpaceMember, SharedSpaceMember.space_id == SharedSpace.id)
+        .where(SharedSpace.id == space_id)
+        .group_by(SharedSpace.id)
+    )).one_or_none()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="공유 공간을 찾을 수 없습니다")
+
+    space, count = row
+    return _space_to_dict(space, count)
+
+
+@router.patch("/{space_id}", response_model=SharedSpaceRead)
+async def update_space(
+    space_id: uuid.UUID,
+    body: SharedSpaceUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    space = (await db.execute(
+        select(SharedSpace).where(SharedSpace.id == space_id)
     )).scalar_one_or_none()
 
-    if not member:
-        raise HTTPException(status_code=403, detail="접근 권한이 없습니다")
+    if not space:
+        raise HTTPException(status_code=404, detail="공유 공간을 찾을 수 없습니다")
+    if space.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="방장만 편집할 수 있습니다")
+
+    space.category_name = body.category_name
+    await db.commit()
+
+    member_count = (await db.execute(
+        select(func.count()).select_from(SharedSpaceMember).where(SharedSpaceMember.space_id == space_id)
+    )).scalar()
+
+    return _space_to_dict(space, member_count)
+
+
+@router.delete("/{space_id}", status_code=204)
+async def delete_or_leave_space(
+    space_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await _require_member(db, space_id, current_user.id)
 
     space = (await db.execute(
         select(SharedSpace).where(SharedSpace.id == space_id)
@@ -145,11 +192,21 @@ async def get_space(
     if not space:
         raise HTTPException(status_code=404, detail="공유 공간을 찾을 수 없습니다")
 
-    count = (await db.execute(
-        select(func.count()).select_from(SharedSpaceMember).where(SharedSpaceMember.space_id == space_id)
-    )).scalar()
+    if space.owner_id == current_user.id:
+        # 방장: 스페이스 전체 삭제
+        await db.delete(space)
+    else:
+        # 일반 멤버: 본인만 탈퇴
+        member = (await db.execute(
+            select(SharedSpaceMember).where(
+                SharedSpaceMember.space_id == space_id,
+                SharedSpaceMember.user_id == current_user.id,
+            )
+        )).scalar_one_or_none()
+        if member:
+            await db.delete(member)
 
-    return _space_to_dict(space, count)
+    await db.commit()
 
 
 @router.get("/{space_id}/records")
@@ -160,15 +217,7 @@ async def get_space_records(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    member = (await db.execute(
-        select(SharedSpaceMember).where(
-            SharedSpaceMember.space_id == space_id,
-            SharedSpaceMember.user_id == current_user.id,
-        )
-    )).scalar_one_or_none()
-
-    if not member:
-        raise HTTPException(status_code=403, detail="접근 권한이 없습니다")
+    await _require_member(db, space_id, current_user.id)
 
     base_stmt = (
         select(Record)

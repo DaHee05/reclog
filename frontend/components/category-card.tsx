@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { BookOpen, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import type { Category } from '@/lib/types';
 import { fetchRecords } from '@/lib/api';
 import {
@@ -33,11 +33,12 @@ interface CategoryCardProps {
   count: number;
   recentImage: string | null;
   isDefault?: boolean;
+  priority?: boolean;
   onEdit?: (id: string, name: string) => void;
   onDelete?: (id: string, name: string) => void;
 }
 
-export function CategoryCard({ id, category, count, isDefault, onEdit, onDelete }: CategoryCardProps) {
+export function CategoryCard({ id, category, count, isDefault, priority = false, onEdit, onDelete }: CategoryCardProps) {
   const config = categoryConfig[category] || { label: category, description: '나만의 기록' };
   const [recentImages, setRecentImages] = useState<string[]>([]);
 
@@ -57,32 +58,26 @@ export function CategoryCard({ id, category, count, isDefault, onEdit, onDelete 
 
   return (
     <div className="relative">
-      <Link href={`/records/${category}`}>
+      <Link href={`/records/${encodeURIComponent(category)}`}>
         <div className="bg-card rounded-2xl p-6 flex items-center justify-between hover:shadow-md transition-all hover:-translate-y-0.5 border border-border/50">
           <div className="flex-1 pr-2">
             <h3 className="text-lg font-bold text-foreground">{config.label}</h3>
             <p className="text-sm text-muted-foreground mt-0.5">{config.description}</p>
           </div>
 
-          <div className="flex items-center gap-3">
-            {hasImages ? (
-              <div className="flex -space-x-2">
-                {recentImages.map((img, idx) => (
-                  <div
-                    key={idx}
-                    className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-card ring-2 ring-primary/20"
-                    style={{ zIndex: recentImages.length - idx }}
-                  >
-                    <Image src={img} alt="" fill className="object-cover" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
-                <BookOpen className="w-7 h-7 text-muted-foreground" />
-              </div>
-            )}
-          </div>
+          {hasImages && (
+            <div className="flex -space-x-2 mr-4">
+              {recentImages.slice(0, 3).map((img, idx) => (
+                <div
+                  key={idx}
+                  className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-card ring-2 ring-primary/20"
+                  style={{ zIndex: recentImages.length - idx }}
+                >
+                  <Image src={img} alt="" fill className="object-cover" priority={priority && idx === 0} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </Link>
 
@@ -104,7 +99,7 @@ export function CategoryCard({ id, category, count, isDefault, onEdit, onDelete 
                   편집하기
                 </DropdownMenuItem>
               )}
-              {onDelete && !isDefault && (
+              {onDelete && (
                 <DropdownMenuItem
                   onClick={() => onDelete(id, config.label)}
                   className="flex items-center gap-2 text-destructive"

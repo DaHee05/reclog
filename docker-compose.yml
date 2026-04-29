@@ -7,8 +7,6 @@ services:
       - .env
     volumes:
       - ./backend:/app
-    depends_on:
-      - db
 
   frontend:
     build: ./frontend
@@ -18,17 +16,3 @@ services:
       - .env
     depends_on:
       - backend
-
-  db:
-    image: postgres:16-alpine
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-reclog}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reclog}
-      POSTGRES_DB: ${POSTGRES_DB:-reclog}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
-volumes:
-  pgdata:

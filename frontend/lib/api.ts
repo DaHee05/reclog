@@ -11,7 +11,11 @@ async function authHeaders(): Promise<HeadersInit> {
 }
 
 async function authFetch(url: string, options?: RequestInit): Promise<Response> {
-  const res = await fetch(url, options);
+  const auth = await authHeaders();
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...auth, ...options?.headers },
+  });
   if (res.status === 401) {
     await supabase.auth.signOut();
     window.location.href = '/login';
@@ -74,9 +78,7 @@ export interface UserProfile {
 }
 
 export async function fetchMe(): Promise<UserProfile> {
-  const res = await authFetch(`${API_URL}/api/users/me`, {
-    headers: { ...await authHeaders() },
-  });
+  const res = await authFetch(`${API_URL}/api/users/me`);
   if (!res.ok) throw new Error('Failed to fetch user');
   return res.json();
 }
@@ -84,7 +86,7 @@ export async function fetchMe(): Promise<UserProfile> {
 export async function updateProfile(data: { nickname?: string; avatar_url?: string; delete_avatar?: boolean }): Promise<UserProfile> {
   const res = await authFetch(`${API_URL}/api/users/me`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error('Failed to update profile');
@@ -106,9 +108,7 @@ export async function fetchRecords(category?: string, page = 1, size = 5): Promi
   params.set('page', String(page));
   params.set('size', String(size));
 
-  const res = await authFetch(`${API_URL}/api/records?${params}`, {
-    headers: { ...await authHeaders() },
-  });
+  const res = await authFetch(`${API_URL}/api/records?${params}`);
   if (!res.ok) throw new Error('Failed to fetch records');
 
   const data = await res.json();
@@ -121,29 +121,14 @@ export async function fetchRecords(category?: string, page = 1, size = 5): Promi
   };
 }
 
-export async function fetchAllRecords(category?: string): Promise<TravelRecord[]> {
-  const params = new URLSearchParams();
-  if (category && category !== 'all') params.set('category', category);
-  params.set('size', '1000');
-
-  const res = await authFetch(`${API_URL}/api/records?${params}`, {
-    headers: { ...await authHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to fetch records');
-
-  const data = await res.json();
-  return data.items.map((r: ApiRecord) => toTravelRecord(r));
-}
-
-export async function fetchRecordsByMonth(year: number, month: number): Promise<TravelRecord[]> {
+export async function fetchRecordsByMonth(year: number, month: number, includeShared = false): Promise<TravelRecord[]> {
   const params = new URLSearchParams();
   params.set('year', String(year));
   params.set('month', String(month));
   params.set('size', '100');
+  if (includeShared) params.set('include_shared', 'true');
 
-  const res = await authFetch(`${API_URL}/api/records?${params}`, {
-    headers: { ...await authHeaders() },
-  });
+  const res = await authFetch(`${API_URL}/api/records?${params}`);
   if (!res.ok) throw new Error('Failed to fetch records');
 
   const data = await res.json();
@@ -151,17 +136,13 @@ export async function fetchRecordsByMonth(year: number, month: number): Promise<
 }
 
 export async function fetchRecordStats() {
-  const res = await authFetch(`${API_URL}/api/records/stats`, {
-    headers: { ...await authHeaders() },
-  });
+  const res = await authFetch(`${API_URL}/api/records/stats`);
   if (!res.ok) throw new Error('Failed to fetch stats');
   return res.json();
 }
 
 export async function fetchRecord(id: string): Promise<TravelRecord | null> {
-  const res = await authFetch(`${API_URL}/api/records/${id}`, {
-    headers: { ...await authHeaders() },
-  });
+  const res = await authFetch(`${API_URL}/api/records/${id}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error('Failed to fetch record');
 
@@ -181,7 +162,7 @@ export async function createRecord(record: {
 }): Promise<TravelRecord> {
   const res = await authFetch(`${API_URL}/api/records`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
   });
   if (!res.ok) throw new Error('Failed to create record');
@@ -204,7 +185,7 @@ export async function updateRecord(
 ): Promise<TravelRecord> {
   const res = await authFetch(`${API_URL}/api/records/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
   });
   if (!res.ok) {
@@ -217,18 +198,13 @@ export async function updateRecord(
 }
 
 export async function deleteRecord(id: string): Promise<void> {
-  const res = await authFetch(`${API_URL}/api/records/${id}`, {
-    method: 'DELETE',
-    headers: { ...await authHeaders() },
-  });
+  const res = await authFetch(`${API_URL}/api/records/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete record');
 }
 
 // --- Categories ---
 export async function fetchCategories(): Promise<ApiCategory[]> {
-  const res = await authFetch(`${API_URL}/api/categories`, {
-    headers: { ...await authHeaders() },
-  });
+  const res = await authFetch(`${API_URL}/api/categories`);
   if (!res.ok) throw new Error('Failed to fetch categories');
   return res.json();
 }
@@ -236,7 +212,7 @@ export async function fetchCategories(): Promise<ApiCategory[]> {
 export async function updateCategory(id: string, name?: string): Promise<ApiCategory> {
   const res = await authFetch(`${API_URL}/api/categories/${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   });
   if (!res.ok) throw new Error('Failed to update category');
@@ -244,17 +220,14 @@ export async function updateCategory(id: string, name?: string): Promise<ApiCate
 }
 
 export async function deleteCategory(id: string): Promise<void> {
-  const res = await authFetch(`${API_URL}/api/categories/${id}`, {
-    method: 'DELETE',
-    headers: { ...await authHeaders() },
-  });
+  const res = await authFetch(`${API_URL}/api/categories/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete category');
 }
 
 export async function createCategory(name: string): Promise<ApiCategory> {
   const res = await authFetch(`${API_URL}/api/categories`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   });
   if (!res.ok) throw new Error('Failed to create category');
@@ -268,7 +241,6 @@ export async function uploadImages(files: File[]): Promise<string[]> {
 
   const res = await authFetch(`${API_URL}/api/upload`, {
     method: 'POST',
-    headers: { ...await authHeaders() },
     body: formData,
   });
   if (!res.ok) throw new Error('Failed to upload images');
@@ -278,14 +250,14 @@ export async function uploadImages(files: File[]): Promise<string[]> {
 }
 
 // --- Generate Overlay ---
-export async function generateOverlay(file: File, tags?: string): Promise<string> {
+export async function generateOverlay(file: File, tags?: string, userContent?: string): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
   if (tags) formData.append('tags', tags);
+  if (userContent) formData.append('user_content', userContent);
 
   const res = await authFetch(`${API_URL}/api/generate`, {
     method: 'POST',
-    headers: { ...await authHeaders() },
     body: formData,
   });
   if (!res.ok) {
@@ -318,12 +290,13 @@ export interface PhotobookOrder {
 export async function createPhotobook(order: {
   title: string;
   category?: string;
+  space_id?: string;
   start_date?: string;
   end_date?: string;
 }): Promise<PhotobookOrder> {
   const res = await authFetch(`${API_URL}/api/photobooks`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(order),
   });
   if (!res.ok) throw new Error('Failed to create photobook');
@@ -331,9 +304,7 @@ export async function createPhotobook(order: {
 }
 
 export async function fetchPhotobooks(): Promise<PhotobookOrder[]> {
-  const res = await authFetch(`${API_URL}/api/photobooks`, {
-    headers: { ...await authHeaders() },
-  });
+  const res = await authFetch(`${API_URL}/api/photobooks`);
   if (!res.ok) throw new Error('Failed to fetch photobooks');
   return res.json();
 }
@@ -341,7 +312,7 @@ export async function fetchPhotobooks(): Promise<PhotobookOrder[]> {
 export async function updatePhotobookStatus(id: string, status: PhotobookOrder['status']): Promise<PhotobookOrder> {
   const res = await authFetch(`${API_URL}/api/photobooks/${id}/status`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
   });
   if (!res.ok) throw new Error('Failed to update photobook status');
@@ -378,7 +349,7 @@ export interface SpaceRecord {
 export async function createSharedSpace(category_name: string, category_emoji: string): Promise<SharedSpace> {
   const res = await authFetch(`${API_URL}/api/spaces`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ category_name, category_emoji }),
   });
   if (!res.ok) throw new Error('Failed to create shared space');
@@ -388,7 +359,7 @@ export async function createSharedSpace(category_name: string, category_emoji: s
 export async function joinSharedSpace(code: string): Promise<SharedSpace> {
   const res = await authFetch(`${API_URL}/api/spaces/join`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...await authHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code }),
   });
   if (res.status === 404) throw Object.assign(new Error('NOT_FOUND'), { status: 404 });
@@ -398,26 +369,35 @@ export async function joinSharedSpace(code: string): Promise<SharedSpace> {
 }
 
 export async function fetchMySpaces(): Promise<SharedSpace[]> {
-  const res = await authFetch(`${API_URL}/api/spaces`, {
-    headers: { ...await authHeaders() },
-  });
+  const res = await authFetch(`${API_URL}/api/spaces`);
   if (!res.ok) throw new Error('Failed to fetch spaces');
   return res.json();
 }
 
-export async function fetchSpace(spaceId: string): Promise<SharedSpace> {
+export async function updateSpace(spaceId: string, categoryName: string): Promise<SharedSpace> {
   const res = await authFetch(`${API_URL}/api/spaces/${spaceId}`, {
-    headers: { ...await authHeaders() },
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category_name: categoryName }),
   });
+  if (!res.ok) throw new Error('Failed to update space');
+  return res.json();
+}
+
+export async function deleteOrLeaveSpace(spaceId: string): Promise<void> {
+  const res = await authFetch(`${API_URL}/api/spaces/${spaceId}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete/leave space');
+}
+
+export async function fetchSpace(spaceId: string): Promise<SharedSpace> {
+  const res = await authFetch(`${API_URL}/api/spaces/${spaceId}`);
   if (!res.ok) throw new Error('Failed to fetch space');
   return res.json();
 }
 
 export async function fetchSpaceRecords(spaceId: string, page = 1, size = 10): Promise<{ items: SpaceRecord[]; total: number; page: number; size: number; total_pages: number }> {
   const params = new URLSearchParams({ page: String(page), size: String(size) });
-  const res = await authFetch(`${API_URL}/api/spaces/${spaceId}/records?${params}`, {
-    headers: { ...await authHeaders() },
-  });
+  const res = await authFetch(`${API_URL}/api/spaces/${spaceId}/records?${params}`);
   if (!res.ok) throw new Error('Failed to fetch space records');
   return res.json();
 }

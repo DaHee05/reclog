@@ -22,6 +22,10 @@ class SharedSpaceRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SharedSpaceUpdate(BaseModel):
+    category_name: str
+
+
 class JoinSpaceRequest(BaseModel):
     code: str
 

@@ -2,7 +2,7 @@ import uuid
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update as sa_update, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -14,44 +14,24 @@ from app.schemas.category import CategoryCreate, CategoryRead, CategoryUpdate
 
 router = APIRouter(prefix="/api/categories", tags=["categories"])
 
-DEFAULT_CATEGORIES = [
-    {"name": "travel"},
-    {"name": "daily"},
-]
-
-
-async def _ensure_defaults(db: AsyncSession, user_id: uuid.UUID) -> None:
-    """기본 카테고리가 없으면 자동 생성"""
-    result = await db.execute(
-        select(Category).where(
-            Category.user_id == user_id, Category.is_default == True  # noqa: E712
-        )
-    )
-    if not result.scalars().first():
-        for cat in DEFAULT_CATEGORIES:
-            db.add(Category(
-                user_id=user_id,
-                name=cat["name"],
-                emoji="",
-                is_default=True,
-            ))
-        await db.commit()
-
 
 @router.get("", response_model=List[CategoryRead])
 async def list_categories(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    await _ensure_defaults(db, current_user.id)
-
     # 카테고리 + record_count 조회
     stmt = (
         select(
             Category,
             func.count(Record.id).label("record_count"),
         )
-        .outerjoin(Record, Record.category == Category.name)
+        .outerjoin(
+            Record,
+            (Record.category == Category.name)
+            & (Record.user_id == current_user.id)
+            & (Record.space_id.is_(None)),
+        )
         .where(Category.user_id == current_user.id)
         .group_by(Category.id)
         .order_by(Category.is_default.desc(), Category.created_at)
@@ -125,10 +105,6 @@ async def update_category(
         raise HTTPException(status_code=404, detail="Category not found")
 
     if body.name and body.name != category.name:
-        if category.is_default:
-            raise HTTPException(status_code=400, detail="기본 카테고리의 이름은 변경할 수 없습니다")
-        from app.models.record import Record
-        from sqlalchemy import update as sa_update
         await db.execute(
             sa_update(Record)
             .where(Record.user_id == current_user.id, Record.category == category.name)
@@ -171,8 +147,12 @@ async def delete_category(
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
 
-    if category.is_default:
-        raise HTTPException(status_code=400, detail="기본 카테고리는 삭제할 수 없습니다")
-
+    # 연결된 기록 전체 삭제
+    await db.execute(
+        sa_delete(Record).where(
+            Record.user_id == current_user.id,
+            Record.category == category.name,
+        )
+    )
     await db.delete(category)
     await db.commit()

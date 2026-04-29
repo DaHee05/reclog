@@ -8,13 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { DEFAULT_TAGS, type Category } from '@/lib/types';
-import { fetchRecord, updateRecord, uploadImages } from '@/lib/api';
+import { type Category } from '@/lib/types';
+import { fetchRecord, updateRecord, uploadImages, fetchCategories } from '@/lib/api';
 
-const categoryOptions: { value: Category; label: string; emoji: string }[] = [
-  { value: 'travel', label: '여행', emoji: '✈️' },
-  { value: 'daily', label: '일상', emoji: '📖' },
-];
+interface CategoryOption { id: string; name: string; }
 
 export default function EditRecordPage({
   params,
@@ -37,14 +34,16 @@ export default function EditRecordPage({
 
   const [primaryIndex, setPrimaryIndex] = useState(0);
   const [date, setDate] = useState('');
-  const [category, setCategory] = useState<Category>('travel');
+  const [category, setCategory] = useState<string>('');
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
   const [location, setLocation] = useState('');
   const [content, setContent] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState('');
 
-  // 기존 데이터 불러오기
+  // 기존 데이터 + 카테고리 목록 불러오기
   useEffect(() => {
+    fetchCategories().then((cats) => setCategoryOptions(cats.map((c) => ({ id: c.id, name: c.name })))).catch(console.error);
     fetchRecord(id)
       .then((record) => {
         if (!record) {
@@ -53,7 +52,7 @@ export default function EditRecordPage({
         }
         setDate(record.date.split('T')[0]);
         setCategory(record.category as Category);
-        setLocation(record.location);
+        setLocation(record.location ?? '');
         setContent(record.content);
         setSelectedTags(record.tags);
 
@@ -119,7 +118,7 @@ export default function EditRecordPage({
   };
 
   const handleSave = async () => {
-    if (!content.trim() || !location.trim()) return;
+    if (!content.trim()) return;
 
     setSaving(true);
     try {
@@ -175,13 +174,12 @@ export default function EditRecordPage({
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background px-5 py-4">
-        <div className="flex items-center justify-between">
-          <button onClick={() => router.back()} className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-card transition-colors">
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50 px-5 py-4">
+        <div className="flex items-center justify-between max-w-lg mx-auto">
+          <button onClick={() => router.back()} className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-muted transition-colors">
             <X className="h-5 w-5" />
           </button>
-          <h1 className="text-lg font-semibold text-foreground">기록 편집</h1>
-          <Button onClick={handleSave} size="sm" className="rounded-full px-4" disabled={saving}>
+          <Button onClick={handleSave} size="sm" className="rounded-full px-5" disabled={saving}>
             {saving ? '저장 중...' : '저장'}
           </Button>
         </div>
@@ -244,20 +242,20 @@ export default function EditRecordPage({
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">카테고리</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-wrap gap-2">
               {categoryOptions.map((cat) => (
                 <button
-                  key={cat.value}
-                  onClick={() => setCategory(cat.value)}
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setCategory(cat.name)}
                   className={cn(
-                    'flex flex-col items-center gap-1.5 p-3 rounded-2xl transition-all',
-                    category === cat.value
-                      ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2'
-                      : 'bg-card text-foreground hover:bg-muted'
+                    'px-4 py-2 rounded-full text-sm font-medium transition-all border',
+                    category === cat.name
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-card text-muted-foreground border-border hover:text-foreground'
                   )}
                 >
-                  <span className="text-xl">{cat.emoji}</span>
-                  <span className="text-xs font-medium">{cat.label}</span>
+                  {cat.name}
                 </button>
               ))}
             </div>
@@ -277,29 +275,13 @@ export default function EditRecordPage({
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">해시태그</label>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {DEFAULT_TAGS.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-sm transition-all',
-                    selectedTags.includes(tag)
-                      ? 'bg-foreground text-background'
-                      : 'bg-card text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
             <div className="flex gap-2">
               <Input placeholder="태그 직접 입력" value={customTag} onChange={(e) => setCustomTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCustomTag()} className="bg-card border-0 rounded-xl h-11" />
               <Button variant="outline" onClick={addCustomTag} className="rounded-xl">추가</Button>
             </div>
-            {selectedTags.filter((tag) => !DEFAULT_TAGS.includes(tag)).length > 0 && (
+            {selectedTags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3">
-                {selectedTags.filter((tag) => !DEFAULT_TAGS.includes(tag)).map((tag) => (
+                {selectedTags.map((tag) => (
                   <span key={tag} className="px-3 py-1.5 rounded-full text-sm bg-accent text-accent-foreground flex items-center gap-1">
                     {tag}
                     <button onClick={() => toggleTag(tag)} className="ml-1 hover:text-destructive"><X className="h-3 w-3" /></button>

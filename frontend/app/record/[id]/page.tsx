@@ -10,8 +10,6 @@ import {
   MapPin,
   Pencil,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,12 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { fetchRecord, deleteRecord } from '@/lib/api';
-import type { TravelRecord, Category } from '@/lib/types';
-
-const categoryEmoji: Record<Category, string> = {
-  travel: '✈️',
-  daily: '📖',
-};
+import type { TravelRecord } from '@/lib/types';
 
 export default function RecordDetailPage({
   params,
@@ -85,23 +78,11 @@ export default function RecordDetailPage({
     }
   };
 
-  const nextImage = () => {
-    setCurrentImageIndex((prev) =>
-      prev === record.images.length - 1 ? 0 : prev + 1
-    );
-  };
-
-  const prevImage = () => {
-    setCurrentImageIndex((prev) =>
-      prev === 0 ? record.images.length - 1 : prev - 1
-    );
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto pb-24">
         {/* Header */}
-        <header className="sticky top-0 z-50 bg-background px-5 py-4">
+        <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-sm px-5 py-4">
           <div className="flex items-center justify-between">
             <button onClick={() => router.back()} className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-card transition-colors">
               <ArrowLeft className="h-5 w-5" />
@@ -180,7 +161,7 @@ export default function RecordDetailPage({
           {/* Pseudo-Author & Location */}
           <div className="mb-2 flex items-center gap-1.5">
             <span className="font-semibold text-[14px] text-foreground">
-              {categoryEmoji[record.category]} {record.category === 'travel' ? '여행 기록' : '일상 기록'}
+              {record.category}
             </span>
             {record.location && (
               <>

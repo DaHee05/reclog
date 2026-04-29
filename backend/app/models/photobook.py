@@ -5,6 +5,7 @@ from datetime import datetime, date
 from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import String, Date, DateTime, ForeignKey, Enum
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
@@ -33,6 +34,11 @@ class PhotobookOrder(Base):
     )
     title: Mapped[str] = mapped_column(String(200))
     category: Mapped[Optional[str]] = mapped_column(String(50))
+    space_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("shared_spaces.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     start_date: Mapped[Optional[date]] = mapped_column(Date)
     end_date: Mapped[Optional[date]] = mapped_column(Date)
     status: Mapped[PhotobookStatus] = mapped_column(

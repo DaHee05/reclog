@@ -73,7 +73,6 @@ export default function LoginPage() {
         })
         if (loginError) {
           setError('테스트 계정 생성 완료! 이메일 인증 후 다시 시도해주세요.')
-          setLoading(false)
           return
         }
       }
@@ -89,7 +88,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="max-w-lg mx-auto px-5 w-full">
-          <div className="bg-card rounded-2xl p-8 text-center space-y-4">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-8 text-center space-y-4 border border-border shadow-md shadow-stone-200/40">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
               <Mail className="h-8 w-8 text-primary" />
             </div>
@@ -132,7 +131,7 @@ export default function LoginPage() {
         </div>
 
         {/* Form Card */}
-        <div className="bg-card rounded-2xl p-6 space-y-5">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 space-y-5 border border-border shadow-md shadow-stone-200/40">
           <h2 className="text-xl font-bold text-foreground text-center">
             {isSignUp ? '회원가입' : '로그인'}
           </h2>

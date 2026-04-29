@@ -2,8 +2,8 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
+import { ImageCollage } from '@/components/image-collage';
 import { ArrowLeft, Plus, Loader2, AlertCircle, RefreshCw, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { fetchSpace, fetchSpaceRecords, deleteRecord, type SharedSpace, type SpaceRecord } from '@/lib/api';
@@ -68,7 +68,7 @@ export default function SpacePage({ params }: { params: Promise<{ id: string }> 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto pb-24">
-        <header className="sticky top-0 z-50 bg-background px-5 py-4 border-b border-border">
+        <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-sm px-5 py-4 border-b border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button onClick={() => router.back()} className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-muted transition-colors">
@@ -125,16 +125,7 @@ export default function SpacePage({ params }: { params: Promise<{ id: string }> 
                   <div key={record.id} className="group">
                     {record.images.length > 0 && (
                       <Link href={`/record/${record.id}`} className="block mb-3">
-                        <div className="relative w-full rounded-2xl overflow-hidden">
-                          <Image
-                            src={record.images.sort((a, b) => a.order - b.order)[0].image_url}
-                            alt=""
-                            width={0}
-                            height={0}
-                            sizes="(max-width: 768px) 100vw, 512px"
-                            className="w-full h-auto"
-                          />
-                        </div>
+                        <ImageCollage images={record.images.map((img) => img.image_url)} />
                       </Link>
                     )}
                     <div className="px-1">

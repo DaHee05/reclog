@@ -5,12 +5,9 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr
 
 
-from pydantic import field_validator
-from typing import Optional as Opt
-
 class UserUpdate(BaseModel):
-    nickname: Opt[str] = None
-    avatar_url: Opt[str] = None
+    nickname: Optional[str] = None
+    avatar_url: Optional[str] = None
     delete_avatar: bool = False
 
 

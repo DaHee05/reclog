@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, User, AlertCircle, RefreshCw, Users, Copy, Check } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { Plus, User, AlertCircle, RefreshCw, Users, Copy, Check, Pencil, Trash2, LogOut } from 'lucide-react';
 import { BottomNav } from '@/components/bottom-nav';
 import { CategoryCard } from '@/components/category-card';
-import { fetchCategories, createCategory, updateCategory, deleteCategory, fetchMySpaces, createSharedSpace, joinSharedSpace, type SharedSpace } from '@/lib/api';
+import { fetchCategories, createCategory, updateCategory, deleteCategory, fetchMySpaces, createSharedSpace, joinSharedSpace, updateSpace, deleteOrLeaveSpace, type SharedSpace } from '@/lib/api';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,12 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [spaces, setSpaces] = useState<SharedSpace[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // 공유 스페이스 편집 모달
+  const [showSpaceEditModal, setShowSpaceEditModal] = useState(false);
+  const [spaceEditTarget, setSpaceEditTarget] = useState<SharedSpace | null>(null);
+  const [spaceEditName, setSpaceEditName] = useState('');
 
   // 카테고리 생성 모달
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -68,17 +75,31 @@ export default function HomePage() {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUserId(session?.user?.id ?? null);
+    });
+  }, []);
+
+  // 탭 포커스 시 공유 카테고리 멤버 수 조용히 갱신
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchMySpaces().then(setSpaces).catch(() => { });
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   const handleOpenEdit = (id: string, name: string) => {
     const cat = categories.find((c) => c.id === id);
     setEditTarget({ id, name, emoji: '', isDefault: cat?.is_default ?? false });
     setEditName(name);
-    setShowEditModal(true);
+    setTimeout(() => setShowEditModal(true), 0);
   };
 
   const handleEditSave = async () => {
-    if (!editTarget || editTarget.isDefault) return;
+    if (!editTarget) return;
     try {
       await updateCategory(editTarget.id, editName.trim() || undefined);
       await loadData();
@@ -89,12 +110,43 @@ export default function HomePage() {
   };
 
   const handleDeleteCategory = async (id: string, name: string) => {
-    if (!confirm(`"${name}" 카테고리를 삭제하시겠습니까?\n해당 카테고리의 기록은 삭제되지 않습니다.`)) return;
+    if (!confirm(`"${name}" 카테고리를 삭제하시겠습니까?\n해당 카테고리의 모든 기록도 함께 삭제됩니다.`)) return;
     try {
       await deleteCategory(id);
       await loadData();
     } catch {
       alert('삭제에 실패했습니다.');
+    }
+  };
+
+  const handleOpenSpaceEdit = (space: SharedSpace) => {
+    setSpaceEditTarget(space);
+    setSpaceEditName(space.category_name);
+    setShowSpaceEditModal(true);
+  };
+
+  const handleSpaceEditSave = async () => {
+    if (!spaceEditTarget || !spaceEditName.trim()) return;
+    try {
+      const updated = await updateSpace(spaceEditTarget.id, spaceEditName.trim());
+      setSpaces((prev) => prev.map((s) => s.id === updated.id ? updated : s));
+      setShowSpaceEditModal(false);
+    } catch {
+      alert('편집에 실패했습니다.');
+    }
+  };
+
+  const handleDeleteOrLeaveSpace = async (space: SharedSpace) => {
+    const isOwner = space.owner_id === currentUserId;
+    const msg = isOwner
+      ? `"${space.category_name}" 공유 카테고리를 삭제하시겠습니까?\n모든 기록이 함께 삭제됩니다.`
+      : `"${space.category_name}"에서 나가시겠습니까?`;
+    if (!confirm(msg)) return;
+    try {
+      await deleteOrLeaveSpace(space.id);
+      setSpaces((prev) => prev.filter((s) => s.id !== space.id));
+    } catch {
+      alert('처리에 실패했습니다.');
     }
   };
 
@@ -194,8 +246,7 @@ export default function HomePage() {
             <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/20 text-primary text-xs font-medium">
               :)
             </span>
-            <span>기록을 눌러 자세히 보기</span>
-            <span className="text-muted-foreground/50">{'>'}</span>
+            <span>오늘의 기록을 남겨봐요</span>
           </div>
         </div>
 
@@ -204,7 +255,7 @@ export default function HomePage() {
           {loading && (
             <div className="space-y-4">
               {[1, 2].map((i) => (
-                <div key={i} className="bg-card rounded-2xl p-5 animate-pulse">
+                <div key={i} className="bg-white/90 rounded-2xl p-5 animate-pulse border border-border">
                   <div className="h-5 bg-muted rounded w-1/3 mb-3" />
                   <div className="h-4 bg-muted rounded w-1/2" />
                 </div>
@@ -223,38 +274,60 @@ export default function HomePage() {
           )}
 
           {!loading && !error && spaces.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">공유 카테고리</p>
-              {spaces.map((space) => (
-                <Link key={space.id} href={`/spaces/${space.id}`}>
-                  <div className="bg-card rounded-2xl p-5 flex items-center justify-between hover:shadow-md transition-all hover:-translate-y-0.5 border border-border/50">
-                    <div>
-                      <h3 className="text-lg font-bold text-foreground">{space.category_emoji} {space.category_name}</h3>
-                      <p className="text-sm text-muted-foreground mt-0.5">{space.member_count}명이 함께 기록 중</p>
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-foreground px-1">공유 카테고리</p>
+              <div className="space-y-5">
+                {spaces.map((space) => {
+                  const isOwner = space.owner_id === currentUserId;
+                  return (
+                    <div key={space.id} className="bg-white/90 rounded-2xl p-5 flex items-center justify-between hover:shadow-md transition-all hover:-translate-y-0.5 border border-border shadow-sm shadow-stone-200/30">
+                      <Link href={`/spaces/${space.id}`} className="flex-1 min-w-0">
+                        <h3 className="text-lg font-bold text-foreground">{space.category_emoji} {space.category_name}</h3>
+                      </Link>
+                      <div className="flex items-center gap-1 ml-3">
+                        {isOwner && (
+                          <button
+                            onClick={() => handleOpenSpaceEdit(space)}
+                            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+                          >
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteOrLeaveSpace(space)}
+                          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+                        >
+                          {isOwner
+                            ? <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            : <LogOut className="h-3.5 w-3.5 text-muted-foreground" />
+                          }
+                        </button>
+                      </div>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Users className="h-4 w-4 text-primary" />
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           )}
 
           {!loading && !error && (
-            <div className="space-y-4">
-              {categories.map((cat) => (
-                <CategoryCard
-                  key={cat.id}
-                  id={cat.id}
-                  category={cat.name as any}
-                  count={cat.record_count}
-                  recentImage={null}
-                  isDefault={cat.is_default}
-                  onEdit={handleOpenEdit}
-                  onDelete={handleDeleteCategory}
-                />
-              ))}
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-foreground px-1">내 카테고리</p>
+              <div className="space-y-4">
+                {categories.map((cat, index) => (
+                  <CategoryCard
+                    key={cat.id}
+                    id={cat.id}
+                    category={cat.name as any}
+                    count={cat.record_count}
+                    recentImage={null}
+                    isDefault={cat.is_default}
+                    priority={index === 0}
+                    onEdit={handleOpenEdit}
+                    onDelete={handleDeleteCategory}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </main>
@@ -358,6 +431,26 @@ export default function HomePage() {
               className="bg-muted border-0 rounded-xl h-12"
             />
             <Button onClick={handleEditSave} disabled={!editName.trim()} className="w-full rounded-full h-12">
+              저장하기
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 공유 스페이스 편집 모달 */}
+      <Dialog open={showSpaceEditModal} onOpenChange={setShowSpaceEditModal}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-center">공유 카테고리 편집</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Input
+              value={spaceEditName}
+              onChange={(e) => setSpaceEditName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSpaceEditSave()}
+              className="bg-muted border-0 rounded-xl h-12"
+            />
+            <Button onClick={handleSpaceEditSave} disabled={!spaceEditName.trim()} className="w-full rounded-full h-12">
               저장하기
             </Button>
           </div>

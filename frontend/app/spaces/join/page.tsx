@@ -33,7 +33,7 @@ export default function JoinSpacePage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto pb-24">
-        <header className="sticky top-0 z-50 bg-background px-5 py-4 border-b border-border">
+        <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-sm px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             <button onClick={() => router.back()} className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-muted transition-colors">
               <ArrowLeft className="h-5 w-5" />
